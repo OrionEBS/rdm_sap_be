@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="6.12.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Rdm.Api\Rdm.Api.csproj" />
+    <ProjectReference Include="..\..\src\Rdm.Application\Rdm.Application.csproj" />
+    <ProjectReference Include="..\..\src\Rdm.Infrastructure\Rdm.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Rdm.Sap\Rdm.Sap.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Dựng metadata NCo offline trong test nhật ký gọi SAP (RfcFunctionMetadata...). -->
+    <Reference Include="sapnco">
+      <HintPath>$(SapNcoDir)\sapnco.dll</HintPath>
+    </Reference>
+    <Reference Include="sapnco_utils">
+      <HintPath>$(SapNcoDir)\sapnco_utils.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

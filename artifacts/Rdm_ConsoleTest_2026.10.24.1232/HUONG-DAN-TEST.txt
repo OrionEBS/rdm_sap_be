@@ -1,0 +1,69 @@
+﻿RDM SAP INTEGRATION API — BẢN KIỂM THỬ CHẠY CONSOLE (phiên bản 2026.10.24.1232)
+================================================================================
+
+Bản này GIỮ NGUYÊN cấu hình máy dev: SQL trdm, SAP DEV DRF client 930, tài khoản admin, khóa JWT
+(file api\appsettings.Development.json). Gói có chứa mật khẩu — chỉ dùng nội bộ, không chuyển ra ngoài.
+
+1. ĐIỀU KIỆN MÁY TEST (Windows 10/11 hoặc Windows Server, 64-bit)
+   - ASP.NET Core Runtime 8 x64 (hoặc .NET 8 Hosting Bundle):
+     https://dotnet.microsoft.com/download/dotnet/8.0
+   - Visual C++ 2015-2022 x64 (SAP NCo cần): https://aka.ms/vs/17/release/vc_redist.x64.exe
+   - Mạng tới SAP DEV 10.72.1.39 cổng 3301 và tới SQL Server trong chuỗi kết nối.
+
+2. CHẠY (HTTPS, chỉ định cổng)
+   - Giải nén, nhấp đúp Start-Api.cmd → HTTPS cổng 5200, cửa sổ console hiện log. Ctrl+C để dừng.
+   - Chỉ định cổng / chế độ (mở cmd trong thư mục này):
+       Start-Api.cmd -Port 8443                       HTTPS cổng 8443
+       Start-Api.cmd -Port 8443 -HttpPort 8080        HTTPS 8443 + HTTP 8080
+       Start-Api.cmd -Port 8443 -PfxPath D:\cert\api.pfx -PfxPassword "<mật khẩu pfx>"   chứng chỉ của công ty
+       Start-Api.cmd -Port 5200 -Http                 chỉ HTTP
+   - Chứng chỉ: không truyền -PfxPath → lần chạy đầu TỰ SINH chứng chỉ tự ký cho tên máy + IP máy test
+     (thư mục cert\, dùng lại các lần sau; xóa thư mục cert\ để sinh lại khi đổi IP / tên máy).
+     Trình duyệt / Postman sẽ cảnh báo chứng chỉ không tin cậy: trên máy client import cert\rdm-api.cer vào
+     "Trusted Root Certification Authorities" (certmgr.msc / certlm.msc), hoặc tắt SSL verification trong Postman.
+   - Swagger: https://localhost:<cổng>/swagger  (máy khác: https://<tên-hoặc-IP-máy-test>:<cổng>/swagger)
+   - Kiểm tra sống: https://localhost:<cổng>/health → "status":"Healthy"
+   - Cho máy khác truy cập: Open-Firewall.cmd <cổng> bằng Run as administrator (VD Open-Firewall.cmd 8443).
+   - Cổng đang bị chương trình khác dùng → script báo lỗi, chọn cổng khác.
+
+3. LƯU Ý CẤU HÌNH SQL
+   Chuỗi kết nối hiện tại là Server=localhost,43310 (SQL trên chính máy dev). Nếu máy test KHÔNG có SQL riêng,
+   trỏ về máy chủ SQL thật mà KHÔNG sửa file — mở cmd trong thư mục này:
+     set ConnectionStrings__SqlServer=Server=<IP máy SQL>,43310;Database=trdm;User Id=rdmuser;Password=<mật khẩu>;Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=True
+     Start-Api.cmd
+   Khi khởi động, API tự chạy migration CSDL (thêm bảng / cột còn thiếu) — dùng chung DB với máy dev thì
+   job nền (Hangfire) có thể được máy dev hoặc máy test chạy; kết quả vẫn xem được qua API ở cả hai máy.
+
+4. ĐĂNG NHẬP API
+   POST /api/auth/token  {"username":"admin","password":"<như máy dev>"} → copy accessToken →
+   nút Authorize trên Swagger: Bearer <token> (hết hạn sau 60 phút).
+
+5. API BẢNG GIÁ (BAPI) CẦN KIỂM THỬ
+   - Đồng bộ (≤ 500 dòng):  POST /api/sd/prices-bapi, /change, /invalidate, /approve, /unapprove
+   - Hàng loạt (≤ 20.000 dòng, chạy nền trong chính cửa sổ console):
+       POST /api/sd/prices-bapi/jobs/{create|change|invalidate|approve|unapprove} → 202
+       GET  /api/sd/prices-bapi/jobs/{operation}/{requestId} → 202 (progress) / kết quả
+   - Đọc bảng giá: GET /api/sd/prices?conditionType=ZVLP&salesOrganization=G210&validFrom=...&validTo=...
+   Mỗi request cần requestId MỚI cho mỗi lần ghi (gửi lại requestId cũ = trả kết quả cũ, không ghi lại).
+   SAP DEV ghi thật: test xong hãy hủy hiệu lực (invalidate) các bảng giá đã tạo.
+
+6. LOG KHI CÓ LỖI (gửi kèm khi báo lỗi)
+   - logs\start-api-*.log      MỖI lần chạy Start-Api.cmd: kiểm tra điều kiện, toàn bộ output API, mã thoát + giải thích,
+                               Event Log nếu API crash. API dừng ngay / không lên → gửi file này trước tiên.
+   - api\logs\startup-*.log    lỗi lúc API khởi động (cấu hình, DB, migration)
+   - api\logs\rdm-*.log        log vận hành (kèm requestId khi báo lỗi nghiệp vụ)
+   - api\dev_nco_rfc.log       lỗi kết nối SAP
+   - Bảng dbo.SerilogEvents trong DB.
+   Cửa sổ không tự đóng nữa: luôn dừng ở "Press any key" để đọc lỗi.
+
+7. KHI POWERSHELL BỊ CHẶN (Group Policy) — chạy trực tiếp, chỉ HTTP, không kiểm tra điều kiện
+   Mở cmd:
+     cd /d <thư mục giải nén>\api
+     set ASPNETCORE_ENVIRONMENT=Development
+     set ASPNETCORE_URLS=http://0.0.0.0:5200
+     Rdm.Api.exe
+   HTTPS khi chạy trực tiếp: thêm 3 dòng trước Rdm.Api.exe (cần file .pfx):
+     set ASPNETCORE_URLS=https://0.0.0.0:8443
+     set Kestrel__Certificates__Default__Path=D:\cert\api.pfx
+     set Kestrel__Certificates__Default__Password=<mật khẩu pfx>
+

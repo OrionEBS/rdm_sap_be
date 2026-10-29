@@ -1,0 +1,1698 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Rdm.Application</name>
+    </assembly>
+    <members>
+        <member name="T:Rdm.Application.Abstractions.ISapClient">
+            <summary>Gateway sang SAP. Không throw cho lỗi phía SAP — trả <see cref="T:Rdm.Application.Postings.SapCallResult"/>.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapClient.CheckAccDocumentAsync(Rdm.Application.Requests.AccDocumentPostRequest,System.Threading.CancellationToken)">
+            <summary>BAPI_ACC_DOCUMENT_CHECK — chỉ kiểm tra, không ghi. Succeeded = SAP không báo lỗi.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapClient.GetPricesAsync(Rdm.Application.Postings.PriceQuery,System.Threading.CancellationToken)">
+            <summary>Đọc bảng giá ZVLP / ZVDI / ZMIN / ZVIV (Axxx + KONP).</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapClient.CheckPricesAsync(Rdm.Application.Requests.PriceCreateRequest,System.Threading.CancellationToken)">
+            <summary>Chỉ kiểm tra dữ liệu + trùng / chồng hiệu lực, không ghi SAP.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapPostingRepository.TryAddAsync(Rdm.Application.Postings.SapPosting,System.Threading.CancellationToken)">
+            <summary>Insert bản ghi Pending. false nếu (Operation, RequestId) đã tồn tại (race giữa 2 request).</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapPostingRepository.TryRestartFailedAsync(System.Guid,System.String,System.String,System.DateTime,System.Threading.CancellationToken,System.Boolean)">
+            <summary>Chuyển Failed → Pending một cách nguyên tử. false nếu bản ghi không còn ở trạng thái Failed.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapPostingRepository.TryClaimJobAsync(System.Guid,System.DateTime,System.Threading.CancellationToken)">
+            <summary>Đánh dấu job bắt đầu gọi SAP. false nếu đã được đánh dấu trước đó (lần chạy trước bị gián đoạn).</summary>
+        </member>
+        <member name="T:Rdm.Application.Abstractions.IBackgroundPostingQueue">
+            <summary>Hàng đợi xử lý nền cho posting (Hangfire) — tầng Application không phụ thuộc Hangfire.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.IPostingService.SubmitPriceBapiJobAsync(Rdm.Application.Postings.SapOperation,Rdm.Application.Requests.IPostingRequest,System.Threading.CancellationToken)">
+            <summary>
+            Bảng giá hàng loạt (BAPI) xử lý nền: giữ chỗ requestId rồi đưa vào hàng đợi, trả ngay (Status Pending).
+            Gửi lại cùng requestId + payload khi đang chạy → trả trạng thái hiện tại; đã xong → trả kết quả cũ.
+            </summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.IPostingService.RunJobAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Chạy job đã giữ chỗ (gọi từ Hangfire).</summary>
+        </member>
+        <member name="T:Rdm.Application.Abstractions.ISapMasterDataClient">
+            <summary>Đọc dữ liệu từ SAP (không ghi) — an toàn để retry.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.ISapMasterDataClient.GetCustomerCreditsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Đọc KNKK qua RFC_READ_TABLE. customer = null → tất cả khách hàng;
+            creditControlArea = null → mọi credit control area.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Abstractions.IMasterDataRepository">
+            <summary>Ghi master data xuống DB local.</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.IMasterDataRepository.ReplaceAllAsync``1(System.Collections.Generic.IReadOnlyCollection{``0},System.Threading.CancellationToken)">
+            <summary>Thay toàn bộ nội dung bảng (DELETE + SqlBulkCopy trong 1 transaction).</summary>
+        </member>
+        <member name="M:Rdm.Application.Abstractions.IMasterDataRepository.Query``1">
+            <summary>Truy vấn chỉ đọc.</summary>
+        </member>
+        <member name="T:Rdm.Application.Abstractions.SapReadException">
+            <summary>Lời gọi đọc SAP thất bại. ErrorCode dùng các hằng trong <see cref="T:Rdm.Application.Postings.SapErrorCodes"/>.</summary>
+        </member>
+        <member name="T:Rdm.Application.ApiCatalog.ApiEndpointSetting">
+            <summary>
+            1 API trong bảng cấu hình rdm.ApiEndpoints. Khóa = "METHOD route-template" (VD "POST api/sd/prices-bapi/jobs/create").
+            IsActive = false → API không hiện trên Swagger và trả 404 như URL không tồn tại. IsLocked = luôn active (đăng nhập, quản trị).
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.ApiCatalog.ApiEndpointSetting.GroupName">
+            <summary>Nhóm = tên controller (VD PricesBapi, Fi, MasterData) — bật / tắt cả nhóm.</summary>
+        </member>
+        <member name="P:Rdm.Application.ApiCatalog.ApiEndpointSetting.Description">
+            <summary>Mô tả API (lấy từ tài liệu Swagger / XML doc lúc khởi động).</summary>
+        </member>
+        <member name="P:Rdm.Application.ApiCatalog.ApiEndpointSetting.LastSeenAtUtc">
+            <summary>Lần cuối API còn trong code (đồng bộ lúc khởi động). Cũ hơn lần khởi động gần nhất = API đã bị xóa khỏi code.</summary>
+        </member>
+        <member name="T:Rdm.Application.ApiCatalog.ApiEndpointInfo">
+            <summary>API phát hiện trong code lúc khởi động.</summary>
+        </member>
+        <member name="M:Rdm.Application.ApiCatalog.ApiEndpointInfo.#ctor(System.String,System.String,System.String,System.String,System.String,System.Boolean,System.String)">
+            <summary>API phát hiện trong code lúc khởi động.</summary>
+        </member>
+        <member name="M:Rdm.Application.ApiCatalog.IApiEndpointRepository.SyncAsync(System.Collections.Generic.IReadOnlyCollection{Rdm.Application.ApiCatalog.ApiEndpointInfo},System.Boolean,System.DateTime,System.Threading.CancellationToken)">
+            <summary>Thêm API mới (IsActive = defaultActive), cập nhật thông tin + LastSeenAtUtc của API còn trong code; API khóa luôn active.</summary>
+        </member>
+        <member name="M:Rdm.Application.ApiCatalog.IApiEndpointRepository.SetActiveAsync(System.Collections.Generic.IReadOnlyCollection{System.String},System.Collections.Generic.IReadOnlyCollection{System.String},System.Boolean,System.String,System.String,System.DateTime,System.Threading.CancellationToken)">
+            <summary>Bật / tắt theo danh sách khóa và / hoặc nhóm; bỏ qua API khóa. Trả các khóa đã đổi.</summary>
+        </member>
+        <member name="F:Rdm.Application.Auth.ApiRoles.Admin">
+            <summary>Gọi mọi API + quản trị tài khoản.</summary>
+        </member>
+        <member name="F:Rdm.Application.Auth.ApiRoles.User">
+            <summary>Gọi mọi API nghiệp vụ.</summary>
+        </member>
+        <member name="T:Rdm.Application.Auth.ApiUser">
+            <summary>Tài khoản gọi API (rdm.ApiUsers). Mật khẩu lưu dạng băm PBKDF2.</summary>
+        </member>
+        <member name="M:Rdm.Application.Auth.IApiUserRepository.UpsertAsync(System.String,System.String,System.String,System.Boolean,System.DateTime,System.Threading.CancellationToken)">
+            <summary>Tạo / cập nhật. passwordHash = null → giữ mật khẩu cũ.</summary>
+        </member>
+        <member name="M:Rdm.Application.Auth.AuthService.ValidateAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Kiểm tra username/password. null nếu sai, không tồn tại hoặc bị khóa (không phân biệt để tránh dò tài khoản).</summary>
+        </member>
+        <member name="M:Rdm.Application.Auth.AuthService.SaveUserAsync(System.String,System.String,System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>Tạo hoặc cập nhật tài khoản. password = null → giữ mật khẩu cũ (bắt buộc khi tạo mới).</summary>
+        </member>
+        <member name="M:Rdm.Application.Auth.AuthService.EnsureBootstrapAdminAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Lần chạy đầu (chưa có tài khoản nào): tạo admin từ cấu hình Auth:BootstrapAdmin.</summary>
+        </member>
+        <member name="T:Rdm.Application.Customers.CustomerCredit">
+            <summary>
+            1 dòng KNKK — hạn mức tín dụng khách hàng theo credit control area.
+            Số tiền đã quy đổi về giá trị thực theo số lẻ của tiền tệ (TCURX), vd. VND: SAP lưu 112941.20 → 11294120.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CustomerNumber">
+            <summary>KUNNR — Customer number.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreditControlArea">
+            <summary>KKBER — Credit control area.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.Currency">
+            <summary>T014-WAERS — Tiền tệ của credit control area (tiền tệ của KLIMK/SAUFT/SKFOR/SSOBL).</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreditLimit">
+            <summary>KLIMK — Credit limit.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreditAccount">
+            <summary>KNKLI — Customer's account number with credit limit reference.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.SalesValue">
+            <summary>SAUFT — Total of sales values for credit limit check.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.Receivables">
+            <summary>SKFOR — Total receivables.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.SpecialLiabilities">
+            <summary>SSOBL — Relevant special liabilities.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreditLimitExceededOn">
+            <summary>UEDAT — Date on which the credit limit was exceeded.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreatedBy">
+            <summary>ERNAM — Created by.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreatedOn">
+            <summary>ERDAT — Created on.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.RiskCategory">
+            <summary>CTLPC — Risk category.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.CreditInfoNumber">
+            <summary>KRAUS — Credit information number.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.ChangedOn">
+            <summary>AEDAT — Changed on.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.ChangedBy">
+            <summary>AENAM — Changed by.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.LastPaymentDate">
+            <summary>CASHD — Date of last payment.</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.LastPaymentAmount">
+            <summary>CASHA — Amount of last payment (theo LastPaymentCurrency).</summary>
+        </member>
+        <member name="P:Rdm.Application.Customers.CustomerCredit.LastPaymentCurrency">
+            <summary>CASHC — Currency of last payment.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.MasterDataObject">
+            <summary>Các nhóm master data SD đồng bộ từ SAP về DB local (schema md).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.SoldTo">
+            <summary>KNA1 + KNVP (PARVW = AG): khách hàng là sold-to ở ít nhất 1 sales area, chưa bị xóa.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.ShipTo">
+            <summary>KNA1 của các khách là partner WE của sold-to: danh mục ship-to (1 dòng / ship-to).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.SoldToShipTo">
+            <summary>KNVP (PARVW = WE): quan hệ sold-to ↔ ship-to theo sales area.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.SalesDistrict">
+            <summary>T171 / T171T.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.SalesOffice">
+            <summary>TVBUR / TVKBT + TVKBZ (gán sales office ↔ sales area).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.ShippingCondition">
+            <summary>TVSB / TVSBT.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.SalesOrg">
+            <summary>TVKO / TVKOT.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.Plant">
+            <summary>T001W — chỉ quốc gia trong Sap:PlantCountries (mặc định VN).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.PaymentMethod">
+            <summary>T042Z.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.VehicleType">
+            <summary>T173 / T173T — shipping type (10T Truck, 20T Truck...).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.CustomerGroup3">
+            <summary>TVV3 / TVV3T.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.Material">
+            <summary>MARA (chỉ loại vật tư trong Sap:MaterialTypes, mặc định ZFNP) + MAKT (tên EN / VI) + T006A (đơn vị tính).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.MaterialGroup">
+            <summary>T023 / T023T.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.MaterialType">
+            <summary>T134 / T134T.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.Division">
+            <summary>TSPA / TSPAT.</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.GlAccount">
+            <summary>BAPI_GL_ACC_GETLIST — chỉ company code thuộc COA Sap:ChartOfAccounts (1000) và CO area Sap:ControllingArea (G100).</summary>
+        </member>
+        <member name="F:Rdm.Application.MasterData.MasterDataObject.CostCenter">
+            <summary>BAPI_COSTCENTER_GETLIST1 — chỉ CO area Sap:ControllingArea (G100).</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.IMasterDataRow">
+            <summary>Mọi bảng master data có thời điểm đồng bộ.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.CustomerNumber">
+            <summary>KUNNR.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.CustomerName">
+            <summary>Tên đầy đủ = NAME2 + NAME3 + NAME4 (quy ước trên SAP: NAME1 là tên ngắn); trống thì lấy NAME1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.SearchTerm">
+            <summary>SORTL — Search term.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.TaxNumber">
+            <summary>Mã số thuế = STCEG, trống thì STCD1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.TaxNumber1">
+            <summary>STCD1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.VatRegistrationNumber">
+            <summary>STCEG — VAT registration number.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.CustomerType">
+            <summary>KTOKD — Account group (loại khách hàng), vd. Z101.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.CustomerTypeName">
+            <summary>T077X-TXT30, vd. Sold-to Party.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToParty.CreatedOn">
+            <summary>ERDAT.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.ShipToParty">
+            <summary>Danh mục ship-to (1 dòng / ship-to) — các khách là partner WE của ít nhất 1 sold-to.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.ShipToParty.CustomerNumber">
+            <summary>KUNNR.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.ShipToParty.CustomerName">
+            <summary>Tên đầy đủ = NAME2 + NAME3 + NAME4; trống thì NAME1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.ShipToParty.TaxNumber">
+            <summary>Mã số thuế = STCEG, trống thì STCD1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.ShipToParty.CustomerType">
+            <summary>KTOKD — Account group.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.SoldToShipTo">
+            <summary>Quan hệ sold-to ↔ ship-to theo sales area (KNVP, PARVW = WE).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.SoldTo">
+            <summary>KNVP-KUNNR.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.SalesOrg">
+            <summary>VKORG.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.DistributionChannel">
+            <summary>VTWEG.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.Division">
+            <summary>SPART.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.PartnerCounter">
+            <summary>PARZA — Partner counter.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.ShipTo">
+            <summary>KUNN2 — Ship-to.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SoldToShipTo.IsDefault">
+            <summary>DEFPA — Default partner.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.CodeTextRow">
+            <summary>Bảng mã có text EN / VI.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SalesOffice.SapData">
+            <summary>Toàn bộ field TVBUR (JSON).</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.SalesOfficeAssignment">
+            <summary>TVKBZ — sales office thuộc sales area nào.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SalesOrganization.Currency">
+            <summary>WAERS.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SalesOrganization.CompanyCode">
+            <summary>BUKRS.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.SalesOrganization.SapData">
+            <summary>Toàn bộ field TVKO (JSON).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Plant.Code">
+            <summary>WERKS.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Plant.SapData">
+            <summary>Toàn bộ field T001W (JSON).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.PaymentMethod.Country">
+            <summary>LAND1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.PaymentMethod.Code">
+            <summary>ZLSCH.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.PaymentMethod.Description">
+            <summary>TEXT1.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.PaymentMethod.SapData">
+            <summary>Toàn bộ field T042Z (JSON).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.VehicleType.SapData">
+            <summary>Toàn bộ field T173 (JSON).</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.Material">
+            <summary>Vật tư (MARA + MAKT).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.MaterialNumber">
+            <summary>MATNR dạng lưu trong SAP (có 0 đầu), vd. 000000000000100016.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.MaterialCode">
+            <summary>Mã hiển thị (bỏ 0 đầu nếu toàn số), vd. 100016.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.NameEn">
+            <summary>MAKT-MAKTX tiếng Anh.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.NameVi">
+            <summary>MAKT-MAKTX tiếng Việt.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.BaseUnit">
+            <summary>MEINS — đơn vị tính cơ sở (mã nội bộ SAP, dùng khi gọi BAPI), vd. ST, TO.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.BaseUnitExternal">
+            <summary>T006A-MSEH3 — mã đơn vị hiển thị, vd. PC, MT.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.BaseUnitNameEn">
+            <summary>T006A-MSEHL tiếng Anh.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.BaseUnitNameVi">
+            <summary>T006A-MSEHL tiếng Việt.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.MaterialType">
+            <summary>MTART.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.MaterialGroup">
+            <summary>MATKL.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.Division">
+            <summary>SPART.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.IsDeleted">
+            <summary>LVORM — đánh dấu xóa ở cấp client.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.CreatedOn">
+            <summary>ERSDA.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.Material.ChangedOn">
+            <summary>LAEDA.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.MaterialGroup.LongNameEn">
+            <summary>T023T-WGBEZ60 tiếng Anh.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.MaterialGroup.LongNameVi">
+            <summary>T023T-WGBEZ60 tiếng Việt.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.MaterialGroup.SapData">
+            <summary>Toàn bộ field T023 (JSON).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.MaterialType.SapData">
+            <summary>Toàn bộ field T134 (JSON).</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.GlAccount">
+            <summary>Tài khoản GL theo company code (BAPI_GL_ACC_GETLIST).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.GlAccount.CompanyCode">
+            <summary>COMP_CODE.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.GlAccount.AccountNumber">
+            <summary>GL_ACCOUNT dạng lưu trong SAP (có 0 đầu), vd. 0011111000.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.GlAccount.AccountCode">
+            <summary>Mã hiển thị (bỏ 0 đầu nếu toàn số), vd. 11111000.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.GlAccount.ChartOfAccounts">
+            <summary>KTOPL — Chart of accounts của company code.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.GlAccount.ShortText">
+            <summary>SHORT_TEXT.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.GlAccount.LongText">
+            <summary>LONG_TEXT.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.CostCenter">
+            <summary>Cost center (BAPI_COSTCENTER_GETLIST1).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.CostCenter.ControllingArea">
+            <summary>CO_AREA.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.CostCenter.Code">
+            <summary>COSTCENTER.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.CostCenter.Name">
+            <summary>NAME.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.CostCenter.Description">
+            <summary>DESCRIPT.</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.CostCenter.ActivationStatus">
+            <summary>ACT_STATE — trạng thái kích hoạt (rỗng = active).</summary>
+        </member>
+        <member name="P:Rdm.Application.MasterData.MasterDataSyncRun.Trigger">
+            <summary>Api / Schedule.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.MasterDataSyncInProgressException">
+            <summary>Đang có 1 lượt đồng bộ khác chạy → HTTP 409.</summary>
+        </member>
+        <member name="M:Rdm.Application.MasterData.MasterDataSyncInProgressException.#ctor">
+            <summary>Đang có 1 lượt đồng bộ khác chạy → HTTP 409.</summary>
+        </member>
+        <member name="M:Rdm.Application.MasterData.IMasterDataSyncService.SyncAsync(System.Collections.Generic.IReadOnlyCollection{Rdm.Application.MasterData.MasterDataObject},System.String,System.Threading.CancellationToken)">
+            <summary>objects rỗng / null = đồng bộ tất cả.</summary>
+        </member>
+        <member name="T:Rdm.Application.MasterData.MasterDataSyncService">
+            <summary>
+            Đọc master data từ SAP và thay toàn bộ bảng tương ứng trong DB local.
+            Mỗi nhóm đồng bộ độc lập: 1 nhóm lỗi không làm hỏng nhóm khác, và bảng lỗi giữ nguyên dữ liệu cũ.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.ProgressSnapshot">
+            <summary>Tiến độ 1 thao tác hàng loạt: tổng số record, đã xử lý, thành công, lỗi.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.ProgressSnapshot.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>Tiến độ 1 thao tác hàng loạt: tổng số record, đã xử lý, thành công, lỗi.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.BulkProgress">
+            <summary>
+            Tiến độ của job xử lý nền, truyền ngầm (AsyncLocal) từ job xuống tầng SAP — không đổi chữ ký ISapClient.
+            Tầng SAP cập nhật từ thread NCo; job đọc định kỳ và lưu vào rdm.SapPostings. Thread-safe.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.BulkProgress.Current">
+            <summary>Tiến độ của job đang chạy trong luồng gọi hiện tại; null khi gọi đồng bộ (không cần báo tiến độ).</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.BulkProgress.Skip(System.Int32)">
+            <summary>Record bỏ qua (đã ở trạng thái đích): tính vào đã xử lý, không vào thành công / lỗi.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PostingResponse">
+            <summary>Kết quả trả về client cho mọi API ghi SAP.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PostingResponse.Replayed">
+            <summary>true = requestId đã post thành công trước đó; trả lại kết quả cũ, KHÔNG gọi SAP lần nữa.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PostingResponse.DocumentNumber">
+            <summary>Số chứng từ SAP (BELNR với FI, VBELN với VA01/VA41). VBN1 tạo condition record nên không có số.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PostingResponse.ObjectType">
+            <summary>OBJ_TYPE / OBJ_KEY / OBJ_SYS — dùng khi cần đảo chứng từ bằng BAPI_ACC_DOCUMENT_REV_POST.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PostingResponse.IsBackgroundJob">
+            <summary>true = xử lý nền; Status = Pending nghĩa là đang chờ / đang chạy — xem <see cref="P:Rdm.Application.Postings.PostingResponse.Progress"/>.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PostingConflictException">
+            <summary>
+            requestId đang xử lý / ở trạng thái Unknown / bị dùng lại cho payload khác → HTTP 409.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PostingService">
+            <summary>
+            Điều phối mọi lời gọi ghi SAP:
+              1. Giữ chỗ requestId (bản ghi Pending, unique theo Operation + RequestId).
+              2. Gọi SAP đúng 1 lần — KHÔNG retry lời gọi ghi (rủi ro chứng từ trùng).
+              3. Lưu kết quả. Gửi lại requestId đã Succeeded → trả kết quả cũ; Failed → cho gửi lại;
+                 Pending/Unknown → 409 vì không chắc SAP đã tạo chứng từ hay chưa.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PostingService.ProgressInterval">
+            <summary>Chu kỳ ghi tiến độ job xuống DB.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.PostingService.JobSpec(Rdm.Application.Postings.SapOperation)">
+            <summary>Thao tác được phép chạy nền + kiểu request + lời gọi SAP tương ứng.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.PostingService.SaveProgressAsync(System.Guid,Rdm.Application.Postings.BulkProgress,Rdm.Application.Postings.ProgressSnapshot)">
+            <summary>Lưu tiến độ nếu đổi; lỗi ghi tiến độ không làm hỏng job.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PriceErrorCodes">
+            <summary>
+            Mã lỗi / cảnh báo theo từng dòng bảng giá — nằm ở <see cref="P:Rdm.Application.Postings.SapReturnMessage.Number"/>, <see cref="P:Rdm.Application.Postings.SapReturnMessage.Item"/> = số dòng
+            (create / change: thứ tự 1..n trong request; approve: KNUMH). Request có dòng lỗi → ErrorCode = PRICE_VALIDATION, HTTP 422, không ghi SAP.
+            </summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.Validation">
+            <summary>Mã lỗi chung của request khi có ít nhất 1 dòng lỗi kiểm tra.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidConditionType">
+            <summary>Loại điều kiện không thuộc ZVLP / ZVDI / ZMIN / ZVIV.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidKey">
+            <summary>Thiếu trường khóa bắt buộc của bảng điều kiện, hoặc truyền trường không thuộc bảng.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidPeriod">
+            <summary>Hiệu lực không hợp lệ (đến &lt; từ).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidAmount">
+            <summary>Giá sai dấu (ZVDI phải âm, loại khác phải dương) hoặc bằng 0.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.DuplicateInRequest">
+            <summary>2 dòng trong cùng request trùng khóa và chồng hiệu lực.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.SamePeriodExists">
+            <summary>Đã có bảng giá cùng khóa, cùng nguyên kỳ hiệu lực (dùng API sửa thay vì tạo).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.OverlapPending">
+            <summary>Chồng hiệu lực với bảng giá đang chờ duyệt (KFRST = A) cùng khóa — duyệt hoặc sửa bản đó trước.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.Overlap">
+            <summary>Chồng hiệu lực với bảng giá đã duyệt cùng khóa (OverlapMode = Reject).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.WillAdjustExisting">
+            <summary>Cảnh báo (OverlapMode = Replace): bảng giá đã duyệt sẽ bị SAP cắt / tách / thay khi tạo bảng giá mới.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.NoChange">
+            <summary>Dòng sửa không có field nào thay đổi.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.NotFound">
+            <summary>Không tìm thấy condition record.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.Deleted">
+            <summary>Condition record đã bị đánh dấu xóa.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.NotSupported">
+            <summary>Condition record không thuộc ZVLP / ZVDI / ZMIN / ZVIV.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.SplitRecord">
+            <summary>Đổi hiệu lực đến của record đã bị SAP tách nhiều kỳ mà không truyền PeriodStart (hoặc PeriodStart không khớp kỳ nào).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.AlreadyApproved">
+            <summary>Thông tin (approve): record đã duyệt — bỏ qua.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.SourceNotFound">
+            <summary>Copy theo VAT: không có bảng giá nguồn khớp bộ lọc.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.TooManySources">
+            <summary>Copy theo VAT: quá nhiều bảng giá nguồn — thu hẹp bộ lọc.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.Ok">
+            <summary>Thành công từng dòng (create: MessageV1 = KNUMH mới).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.Partial">
+            <summary>SAP ghi được một phần (Z_ESD015 commit từng dòng): xem PRICE_OK / lỗi từng dòng; gửi lại chỉ các dòng lỗi.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.FunctionMissing">
+            <summary>Hàm RFC Z_ESD015_PRICE_UPLOAD / Z_ESD016_PRICES_CONDITIONS chưa có trên SAP.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.AlreadyPending">
+            <summary>Thông tin (gỡ duyệt): record đang chờ duyệt — bỏ qua.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.AlreadyDeleted">
+            <summary>Thông tin (hủy hiệu lực): record đã bị đánh dấu xóa — bỏ qua.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.NotApplied">
+            <summary>SAP báo thành công nhưng đọc lại không thấy trạng thái mới (duyệt / gỡ duyệt / hủy hiệu lực).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.SapError">
+            <summary>Record lỗi phía SAP (BAPI trả E/A) — chi tiết ở message SAP cùng Item (Id / Number = mã lỗi SAP).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidMasterData">
+            <summary>
+            Mã master data không tồn tại trên SAP (đơn vị, tiền tệ, sales org, kênh, plant, shipping condition, incoterms, region,
+            vật tư, khách hàng). BAPI_PRICES_CONDITIONS KHÔNG tự kiểm tra (khác VK11) nên API kiểm tra trước khi ghi.
+            </summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.NotProcessed">
+            <summary>Chưa xử lý do mất kết nối ở record trước.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.ValidationError">
+            <summary>
+            Lỗi kỹ thuật khi đang kiểm tra (đọc SAP lỗi, dữ liệu không chuyển được sang kiểu SAP...) — chưa ghi SAP.
+            Message chỉ có tên bước + mã tham chiếu; chi tiết exception nằm trong log (tìm theo mã tham chiếu).
+            </summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.NoAuthority">
+            <summary>Vỏ RFC Z_ESD016: user RFC thiếu quyền VK11 / VK12.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.UnexpectedError">
+            <summary>Vỏ RFC Z_ESD016: lỗi không lường trước (đã rollback, chưa ghi SAP).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidRelease">
+            <summary>Vỏ RFC Z_ESD016: release status (KFRST) trong VARKEY không phải trống / A.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidTable">
+            <summary>Vỏ RFC Z_ESD016: không đọc được cấu trúc khóa bảng điều kiện (T681E / DDIC).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.KeyMismatch">
+            <summary>Vỏ RFC Z_ESD016 v3: KNUMH sửa / xóa kỳ không khớp loại / bảng / khóa truyền vào.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidStructure">
+            <summary>Vỏ RFC Z_ESD016 v3: dữ liệu vào sai cấu trúc (OPERATION, số tạm / KNUMH, dòng HD / IT không khớp CT).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PriceErrorCodes.InvalidKeyFormat">
+            <summary>Vỏ RFC Z_ESD016 v4: khóa không ở dạng nội bộ (MATNR 18 số có 0 đầu, KUNNR ALPHA) — message có giá trị đúng.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PriceColumn">
+            <summary>1 cột của bảng giá: tên thuộc tính JSON, field SAP, nhãn.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.PriceColumn.#ctor(System.String,System.String,System.String)">
+            <summary>1 cột của bảng giá: tên thuộc tính JSON, field SAP, nhãn.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PriceTableLayout">
+            <summary>Cấu trúc cột của 1 bảng điều kiện: cột khóa (khác nhau theo bảng) + cột chi tiết (Axxx + KONP).</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.PriceTableLayout.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.PriceColumn},System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.PriceColumn})">
+            <summary>Cấu trúc cột của 1 bảng điều kiện: cột khóa (khác nhau theo bảng) + cột chi tiết (Axxx + KONP).</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PriceListResponse">
+            <summary>Kết quả đọc bảng giá: cấu trúc cột từng bảng điều kiện có trong kết quả + các dòng.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.PriceListResponse.#ctor(System.String,System.String,System.DateOnly,System.DateOnly,System.Int32,System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.PriceTableLayout},System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.PriceRecordDto})">
+            <summary>Kết quả đọc bảng giá: cấu trúc cột từng bảng điều kiện có trong kết quả + các dòng.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PriceRecordDto">
+            <summary>
+            1 kỳ hiệu lực bảng giá trên SAP (1 dòng bảng Axxx + KONP dòng 01).
+            Mỗi bảng điều kiện có cột khóa khác nhau: dòng chỉ có các cột khóa thuộc bảng của nó (xem PriceListResponse.Tables);
+            cột không thuộc bảng không xuất hiện trong JSON.
+            </summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.PriceRecordDto.#ctor(System.String,System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String,System.Boolean,System.DateOnly,System.DateOnly,System.Boolean,System.Nullable{System.Decimal},System.String,System.Nullable{System.Int32},System.String)">
+            <summary>
+            1 kỳ hiệu lực bảng giá trên SAP (1 dòng bảng Axxx + KONP dòng 01).
+            Mỗi bảng điều kiện có cột khóa khác nhau: dòng chỉ có các cột khóa thuộc bảng của nó (xem PriceListResponse.Tables);
+            cột không thuộc bảng không xuất hiện trong JSON.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.SalesOrganization">
+            <summary>VKORG (A990 / A912 / A919) hoặc VKORGAU — sales org của đơn hàng (A991 / ZVIV).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.DistributionChannel">
+            <summary>VTWEG.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.SoldTo">
+            <summary>KUNAG (A990).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.ShipTo">
+            <summary>KUNWE (A990).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.Material">
+            <summary>MATNR dạng SAP (18 ký tự).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.MaterialCode">
+            <summary>Mã vật tư hiển thị (bỏ 0 đầu nếu toàn số).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.ShippingCondition">
+            <summary>VSBED (A990).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.Plant">
+            <summary>WERKS (A990 / A991).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.Incoterms">
+            <summary>INCO1 (A912).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.Region">
+            <summary>REGIO (A919).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.ProcessingStatus">
+            <summary>KBSTAT — processing status của condition record (vd. 01, 02).</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceRecordDto.CalculationType">
+            <summary>KONP-KRECH — calculation type (C = theo số lượng, A = %...).</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PriceQuery">
+            <summary>Bộ lọc đọc bảng giá. Bắt buộc: ConditionType, SalesOrganization, ValidFrom, ValidTo; còn lại tùy chọn.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.ConditionType">
+            <summary>ZVLP / ZVDI (bảng A990), ZVIV (A991), ZMIN (A912 + A919).</summary>
+            <example>ZVLP</example>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.SalesOrganization">
+            <summary>Sales org (với ZVIV là sales org của đơn hàng — VKORGAU).</summary>
+            <example>G210</example>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.ValidFrom">
+            <summary>Lấy các kỳ có hiệu lực giao với khoảng [ValidFrom, ValidTo].</summary>
+            <example>2026-01-01</example>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.ValidTo">
+            <example>2026-12-31</example>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.Incoterms">
+            <summary>ZMIN: truyền Incoterms → chỉ đọc A912.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.Region">
+            <summary>ZMIN: truyền Region → chỉ đọc A919.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.PriceQuery.PendingApproval">
+            <summary>true = chỉ bản chờ duyệt (KFRST = A); false = chỉ bản đã duyệt; bỏ trống = tất cả.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.SapReturnMessage">
+            <summary>1 dòng BAPIRET2 — lưu nguyên văn, không nuốt message SAP.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.SapReturnMessage.#ctor(System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>1 dòng BAPIRET2 — lưu nguyên văn, không nuốt message SAP.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.SapDocumentRef">
+            <summary>Định danh chứng từ SAP sinh ra.</summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.SapDocumentRef.#ctor(System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>Định danh chứng từ SAP sinh ra.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.SapCallResult">
+            <summary>
+            Kết quả 1 lời gọi SAP. Client SAP KHÔNG throw cho lỗi phía SAP mà phân loại vào đây,
+            vì việc phân biệt Failed (chắc chắn chưa ghi) và Unknown (có thể đã ghi) quyết định có được gửi lại hay không.
+            </summary>
+        </member>
+        <member name="M:Rdm.Application.Postings.SapCallResult.#ctor(Rdm.Application.Postings.PostingStatus,System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.SapReturnMessage},Rdm.Application.Postings.SapDocumentRef,System.String,System.String)">
+            <summary>
+            Kết quả 1 lời gọi SAP. Client SAP KHÔNG throw cho lỗi phía SAP mà phân loại vào đây,
+            vì việc phân biệt Failed (chắc chắn chưa ghi) và Unknown (có thể đã ghi) quyết định có được gửi lại hay không.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.SapOperation">
+            <summary>Nghiệp vụ ghi sang SAP mà API hỗ trợ.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.Fb01">
+            <summary>Z_EFI011_CREATE_FB01 — chứng từ FI 2 dòng (GL + khách hàng).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.Fb75">
+            <summary>Z_EFI009_CREATE_FB75 — Customer credit memo.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.AccDocumentReversal">
+            <summary>BAPI_ACC_DOCUMENT_REV_POST — đảo chứng từ kế toán.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.Va01">
+            <summary>Z_ESD014_CREATE_VA01 — Credit memo request (VA01, loại ZVCR).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.Vbn1">
+            <summary>Z_ESD012_CREATE_VBN1 — Condition record free goods (VBN1, loại ZA00).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.Va41">
+            <summary>Z_ESD013_CREATE_VA41 — Free goods contract (VA41, loại ZVCF).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.MaterialTaxClass">
+            <summary>BAPI_MATERIAL_SAVEDATA — đổi tax classification vật tư (MLAN-TAXM1), thay MM17.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.AccDocumentPost">
+            <summary>BAPI_ACC_DOCUMENT_POST — chứng từ FI nhiều dòng (G/L, khách hàng, thuế).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.ContractCreate">
+            <summary>BAPI_CONTRACT_CREATEFROMDATA — tạo sale contract.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.ContractChange">
+            <summary>BAPI_CUSTOMERCONTRACT_CHANGE — sửa sale contract.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.ContractApprove">
+            <summary>BAPI_CUSTOMERCONTRACT_CHANGE — duyệt sale contract (gỡ block duyệt).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceCreate">
+            <summary>Z_ESD015_PRICE_UPLOAD (VK11) — tạo bảng giá.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceChange">
+            <summary>Z_ESD015_PRICE_UPLOAD (VK12) — sửa bảng giá.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceApprove">
+            <summary>Z_ESD015_PRICE_UPLOAD (VK12 processing status 02) — duyệt bảng giá.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceCopyWithVat">
+            <summary>Z_ESD015_PRICE_UPLOAD — tạo bảng giá mới từ bảng giá cũ theo VAT%.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceBapiCreate">
+            <summary>BAPI_PRICES_CONDITIONS (qua Z_ESD016_PRICES_CONDITIONS) — tạo bảng giá (009).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceBapiChange">
+            <summary>BAPI_PRICES_CONDITIONS — sửa bảng giá (004).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceBapiInvalidate">
+            <summary>BAPI_PRICES_CONDITIONS — hủy hiệu lực (đánh dấu xóa, 004 + INDIDELETE).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceBapiApprove">
+            <summary>BAPI_PRICES_CONDITIONS — duyệt (release status A → trống).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapOperation.PriceBapiUnapprove">
+            <summary>BAPI_PRICES_CONDITIONS — gỡ duyệt (release status trống → A).</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.PostingStatus">
+            <summary>Trạng thái 1 lần ghi sang SAP.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PostingStatus.Pending">
+            <summary>Đang gọi SAP.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PostingStatus.Succeeded">
+            <summary>SAP đã tạo chứng từ.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PostingStatus.Failed">
+            <summary>SAP chắc chắn KHÔNG tạo chứng từ (lỗi nghiệp vụ / không kết nối được) — được phép gửi lại.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.PostingStatus.Unknown">
+            <summary>Không xác định được SAP đã tạo chứng từ hay chưa (mất kết nối giữa chừng...) — phải kiểm tra SAP trước khi gửi lại.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.SapErrorCodes">
+            <summary>Mã lỗi trả về cho client khi Status = Failed / Unknown.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapErrorCodes.Business">
+            <summary>SAP trả message E/A trong RETURN hoặc ABAP raise lỗi.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapErrorCodes.Unavailable">
+            <summary>Không kết nối được SAP trước khi gửi lệnh — chưa có gì được ghi.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapErrorCodes.Logon">
+            <summary>Đăng nhập SAP thất bại (user/pass/khóa user).</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapErrorCodes.InvalidData">
+            <summary>Dữ liệu không chuyển được sang kiểu field SAP.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapErrorCodes.UnknownOutcome">
+            <summary>Không xác định kết quả — xem <see cref="F:Rdm.Application.Postings.PostingStatus.Unknown"/>.</summary>
+        </member>
+        <member name="F:Rdm.Application.Postings.SapErrorCodes.Internal">
+            <summary>Lỗi không lường trước phía API.</summary>
+        </member>
+        <member name="T:Rdm.Application.Postings.SapPosting">
+            <summary>
+            Nhật ký + khóa idempotency cho mỗi lần ghi sang SAP. Unique theo (Operation, RequestId).
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.SapPosting.RequestHash">
+            <summary>SHA-256 của payload — phát hiện requestId bị dùng lại cho payload khác.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.SapPosting.IsBackgroundJob">
+            <summary>true = xử lý nền (Hangfire) — client theo dõi bằng GET .../jobs/{operation}/{requestId}.</summary>
+        </member>
+        <member name="P:Rdm.Application.Postings.SapPosting.JobClaimedAtUtc">
+            <summary>Lúc job bắt đầu gọi SAP. Đã có giá trị mà job chạy lại = lần trước bị gián đoạn (server khởi động lại).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.AccDocumentPostRequest">
+            <summary>
+            BAPI_ACC_DOCUMENT_POST — chứng từ FI nhiều dòng (thay các bút toán bị giới hạn bởi Z_EFI011_CREATE_FB01):
+            cấn trừ chiết khấu (ZRDM-013), chiết khấu thanh toán nhiều hóa đơn (016), lãi quá hạn (019), trích trước (020).
+            BAPI không nhận posting key: SAP tự xác định theo loại dòng + Nợ/Có (G/L 40/50, KH 01/11, KH special G/L 09/19).
+            Tiền tệ VND; BAPI không tự tính thuế — dòng Tax phải có số thuế và TaxBaseAmount.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+            <example>ZB-2026-0001</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.CompanyCode">
+            <summary>COMP_CODE — Company code.</summary>
+            <example>G210</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.DocumentType">
+            <summary>DOC_TYPE — Loại chứng từ (DRF-930: ZB Rebates, ZL Accruals, ZD DN to Customer, DG CN to Customer).</summary>
+            <example>ZB</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.DocumentDate">
+            <summary>DOC_DATE — Ngày chứng từ.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.PostingDate">
+            <summary>PSTNG_DATE — Ngày hạch toán.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.FiscalPeriod">
+            <summary>FIS_PERIOD — Kỳ kế toán (1-16). Bỏ trống = SAP tự xác định theo ngày hạch toán.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.Reference">
+            <summary>REF_DOC_NO (XBLNR) — mã tham chiếu RDM; API chặn trùng theo Company code + loại CT + Reference.</summary>
+            <example>RDM-QT-000123</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.HeaderText">
+            <summary>HEADER_TXT (BKTXT) — Diễn giải header.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.NegativePosting">
+            <summary>NEG_POSTNG — Ghi âm (không làm tăng phát sinh Nợ/Có). Loại chứng từ phải cho phép negative posting.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.AllowDuplicateReference">
+            <summary>
+            true = bỏ qua kiểm tra trùng Reference trên SAP (BKPF chưa đảo cùng Company code + loại CT + XBLNR).
+            Chỉ dùng khi chắc chắn muốn tạo thêm chứng từ cùng mã tham chiếu.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentPostRequest.Lines">
+            <summary>Các dòng hạch toán (2..999). Tổng Nợ phải bằng tổng Có.</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.AccDocumentLineType.GL">
+            <summary>ACCOUNTGL — tài khoản tổng hợp (PK 40/50).</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.AccDocumentLineType.Customer">
+            <summary>ACCOUNTRECEIVABLE — khách hàng (PK 01/11; có SpecialGlIndicator → 09/19).</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.AccDocumentLineType.Tax">
+            <summary>ACCOUNTTAX — dòng thuế GTGT (số thuế do client tính, kèm TaxBaseAmount).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.LineType">
+            <summary>Loại dòng: GL, Customer, Tax.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.DebitCredit">
+            <summary>Nợ/Có: "S" = Nợ (Soll), "H" = Có (Haben).</summary>
+            <example>S</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.Amount">
+            <summary>Số tiền dương (VND). Dấu do DebitCredit quyết định.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.GlAccount">
+            <summary>GL_ACCOUNT — bắt buộc với dòng GL; dòng Tax tùy chọn (bỏ trống = theo tax code).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.Customer">
+            <summary>CUSTOMER — bắt buộc với dòng Customer.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.SpecialGlIndicator">
+            <summary>SP_GL_IND — Special G/L indicator của dòng khách hàng (phải có TK đối chiếu trong T074).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.CreditControlArea">
+            <summary>C_CTR_AREA — Credit control area (dòng khách hàng).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.PaymentTerms">
+            <summary>PMNTTRMS — Điều khoản thanh toán (dòng khách hàng ghi Nợ, vd. phải thu lãi).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.BaselineDate">
+            <summary>BLINE_DATE — Baseline date tính hạn thanh toán (dòng khách hàng).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.CostCenter">
+            <summary>COSTCENTER — dòng GL chi phí.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.ProfitCenter">
+            <summary>PROFIT_CTR — Profit center.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.Segment">
+            <summary>SEGMENT — Segment (dòng GL).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.Assignment">
+            <summary>ALLOC_NMBR (ZUONR) — Assignment: mã chương trình RDM / số hóa đơn được hưởng.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.ItemText">
+            <summary>ITEM_TEXT (SGTXT) — Diễn giải dòng.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.TaxCode">
+            <summary>TAX_CODE — bắt buộc với dòng Tax; dòng GL/Customer chịu thuế truyền cùng mã.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.TaxBaseAmount">
+            <summary>AMT_BASE — Cơ sở tính thuế (bắt buộc với dòng Tax, số dương).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.TaxAccountKey">
+            <summary>ACCT_KEY — Account key thuế (vd. MWS). Bỏ trống = SAP xác định theo tax code.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.TaxConditionKey">
+            <summary>COND_KEY — Condition type thuế (vd. MWAS). Bỏ trống = SAP xác định theo tax code.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentLine.ProfitabilitySegment">
+            <summary>
+            CRITERIA — Đặc tính CO-PA của dòng (FIELDNAME → giá trị), vd. { "KNDNR": "100166", "ARTNR": "100016", "VKORG": "G210" }.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.AccDocumentReversalRequest">
+            <summary>
+            BAPI_ACC_DOCUMENT_REV_POST — đảo chứng từ kế toán đã post qua BAPI (AWTYP = BKPFF, vd. chứng từ tạo từ FB01/FB75 API).
+            Nếu không truyền ObjectType/ObjectKey/ObjectSystem, API tự đọc BKPF (AWTYP/AWKEY/AWSYS) theo CompanyCode + DocumentNumber + FiscalYear.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.CompanyCode">
+            <summary>COMP_CODE — Company code của chứng từ gốc.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.DocumentNumber">
+            <summary>BELNR — Số chứng từ gốc.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.FiscalYear">
+            <summary>GJAHR — Năm tài chính của chứng từ gốc.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.ReasonCode">
+            <summary>REASON_REV — Lý do đảo (vd. 01, 02).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.PostingDate">
+            <summary>PSTNG_DATE — Ngày hạch toán chứng từ đảo. Bỏ trống = theo chứng từ gốc.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.FiscalPeriod">
+            <summary>FIS_PERIOD — Kỳ kế toán (1-16). Bỏ trống = SAP tự xác định.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.BusinessTransaction">
+            <summary>BUS_ACT — Business transaction, mặc định RFBU.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.ObjectType">
+            <summary>OBJ_TYPE của chứng từ gốc (AWTYP). Tùy chọn.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.ObjectKey">
+            <summary>OBJ_KEY của chứng từ gốc (AWKEY). Tùy chọn.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.AccDocumentReversalRequest.ObjectSystem">
+            <summary>OBJ_SYS của chứng từ gốc (AWSYS). Tùy chọn.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.ContractCreateRequest">
+            <summary>
+            Tạo sale contract — BAPI_CONTRACT_CREATEFROMDATA + BAPI_TRANSACTION_COMMIT (ZRDM-006, 010).
+            Loại hợp đồng được phép cấu hình ở Sap:ContractTypes (mặc định ZVCQ VN Sales Contract, ZVCF VN Free Remain).
+            RequireApproval = true: header gắn delivery block + billing block chờ duyệt (Sap:ContractApprovalDeliveryBlock /
+            ContractApprovalBillingBlock, mặc định 30 "Price Chg. Approval") → đơn call-off chưa giao/billing được cho tới khi gọi API duyệt.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+            <example>HD-2026-0001</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.ContractType">
+            <summary>DOC_TYPE (AUART) — Loại hợp đồng.</summary>
+            <example>ZVCQ</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.SalesOrganization">
+            <summary>SALES_ORG.</summary>
+            <example>G210</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.DistributionChannel">
+            <summary>DISTR_CHAN.</summary>
+            <example>10</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.Division">
+            <summary>DIVISION.</summary>
+            <example>10</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.SoldTo">
+            <summary>Partner AG — Sold-to.</summary>
+            <example>100166</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.ShipTo">
+            <summary>Partner WE — Ship-to (ZVCF: bắt buộc theo khóa Sold-to + Ship-to + Plant + Material; ZVCQ trên DRF không dùng WE ở header).</summary>
+            <example>100166</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.BillTo">
+            <summary>Partner RE — Bill-to (bỏ trống = SAP xác định theo partner của sold-to).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.Payer">
+            <summary>Partner RG — Payer (bỏ trống = SAP xác định theo partner của sold-to).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.CustomerPoNumber">
+            <summary>PURCH_NO_C — Số hợp đồng / PO của khách hàng.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.CustomerPoDate">
+            <summary>PURCH_DATE — Ngày PO / ngày ký.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.ValidFrom">
+            <summary>CT_VALID_F + CON_ST_DAT — Hiệu lực từ.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.ValidTo">
+            <summary>CT_VALID_T + CON_EN_DAT — Hiệu lực đến.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.SalesOffice">
+            <summary>SALES_OFF.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.SalesGroup">
+            <summary>SALES_GRP.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.ShippingCondition">
+            <summary>SHIP_COND — Shipping condition.</summary>
+            <example>PK</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.PaymentTerms">
+            <summary>PMNTTRMS — Điều khoản thanh toán (bỏ trống = theo khách hàng).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractCreateRequest.RequireApproval">
+            <summary>true (mặc định) = tạo ở trạng thái chờ duyệt (gắn delivery + billing block duyệt).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.ContractItemInput">
+            <summary>Dòng hợp đồng.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.ItemNumber">
+            <summary>ITM_NUMBER — bỏ trống khi tạo = tự đánh 10, 20, 30…</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.Material">
+            <summary>MATERIAL.</summary>
+            <example>100016</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.TargetQuantity">
+            <summary>TARGET_QTY — Định mức sản lượng (ZVCQ trên DRF thường để 0).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.Unit">
+            <summary>TARGET_QU — Đơn vị (mã nội bộ SAP, vd. TO, BAG).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.Plant">
+            <summary>PLANT (ZVCF: bắt buộc theo nghiệp vụ; ZVCQ có thể bỏ trống).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.ShippingPoint">
+            <summary>SHIP_POINT.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemInput.ShortText">
+            <summary>SHORT_TEXT — Mô tả dòng (bỏ trống = tên vật tư).</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.ContractItemAction.Add">
+            <summary>Thêm dòng mới.</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.ContractItemAction.Update">
+            <summary>Sửa số lượng / plant / shipping point của dòng có sẵn.</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.ContractItemAction.Reject">
+            <summary>Từ chối (hủy) dòng bằng reason for rejection — dòng không bị xóa khỏi SAP.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.ContractChangeRequest">
+            <summary>
+            Sửa sale contract — BAPI_CUSTOMERCONTRACT_CHANGE + BAPI_TRANSACTION_COMMIT.
+            Chỉ field được truyền mới bị đổi. RequireReapproval = true (mặc định): gắn lại block duyệt sau khi sửa.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractChangeRequest.ContractNumber">
+            <summary>VBELN — Số hợp đồng SAP.</summary>
+            <example>1100000000</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractChangeRequest.ValidFrom">
+            <summary>Hiệu lực từ mới (header + contract data của mọi dòng).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractChangeRequest.ValidTo">
+            <summary>Hiệu lực đến mới.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractChangeRequest.RequireReapproval">
+            <summary>true (mặc định) = sửa xong hợp đồng trở về trạng thái chờ duyệt.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemChange.ItemNumber">
+            <summary>ITM_NUMBER — bắt buộc với Update/Reject; Add bỏ trống = số lớn nhất hiện có + 10.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractItemChange.RejectionReason">
+            <summary>REASON_REJ (ABGRU) — Lý do từ chối (Reject).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.ContractApproveRequest">
+            <summary>
+            Duyệt sale contract — gỡ delivery block + billing block duyệt ở header (BAPI_CUSTOMERCONTRACT_CHANGE + COMMIT).
+            Chỉ gỡ block đúng mã duyệt cấu hình; block khác (vd. Z1 credit limit) được giữ nguyên.
+            Hợp đồng không còn block duyệt → trả thành công, không gọi BAPI.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractApproveRequest.ContractNumber">
+            <summary>VBELN — Số hợp đồng SAP.</summary>
+            <example>1100000000</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.ContractApproveRequest.ApprovedBy">
+            <summary>Người duyệt trên RDM (lưu ở nhật ký API, không ghi vào SAP).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.IPostingRequest">
+            <summary>Mọi request ghi SAP phải có requestId để chống tạo chứng từ trùng khi client gửi lại.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.Fb01Request">
+            <summary>
+            Z_EFI011_CREATE_FB01 (structure ZSFI_FB01). SAP post qua BAPI_ACC_DOCUMENT_POST 2 dòng:
+            dòng 1 GL, dòng 2 khách hàng (số tiền dòng 2 SAP tự đổi dấu âm). Tiền tệ cố định VND phía SAP.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.RequestId">
+            <summary>Khóa idempotency do client sinh (vd. mã chứng từ nguồn). Gửi lại cùng requestId sẽ không tạo chứng từ mới.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.CompanyCode">
+            <summary>BUKRS — Company code.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.DocumentType">
+            <summary>BLART — Document type.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.DocumentDate">
+            <summary>BLDAT — Document date.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.PostingDate">
+            <summary>BUDAT — Posting date.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.Reference">
+            <summary>XBLNR — Reference.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.HeaderText">
+            <summary>BKTXT — Header text.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.CreditControlArea">
+            <summary>KKBER — Credit control area.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.GlLine">
+            <summary>Dòng 1 — GL.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01Request.CustomerLine">
+            <summary>Dòng 2 — Khách hàng.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01GlLine.PostingKey">
+            <summary>ZZBSCHL_1 — Posting key (vd. 40).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01GlLine.GlAccount">
+            <summary>ZZHKONT_1 — GL account.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01GlLine.Amount">
+            <summary>ZZWRBTR_1 — Amount (VND).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01GlLine.CostCenter">
+            <summary>ZZKOSTL_1 — Cost center.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01GlLine.ItemText">
+            <summary>ZZSGTXT_1 — Item text.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01CustomerLine.PostingKey">
+            <summary>ZZBSCHL_2 — Posting key (vd. 19).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01CustomerLine.Customer">
+            <summary>KUNNR — Customer.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01CustomerLine.SpecialGlIndicator">
+            <summary>ZZUMSKZ_2 — Special G/L indicator.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01CustomerLine.Amount">
+            <summary>ZZWRBTR_2 — Amount (VND, gửi số dương; SAP tự đổi dấu).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb01CustomerLine.ItemText">
+            <summary>ZZSGTXT_2 — Item text.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.Fb75Request">
+            <summary>
+            Z_EFI009_CREATE_FB75 (structure ZSFI_FB75) — Customer credit memo.
+            SAP post 3 dòng qua BAPI_ACC_DOCUMENT_POST: khách hàng (-Amount), GL (TaxBaseAmount), thuế. Tiền tệ cố định VND.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.CompanyCode">
+            <summary>BUKRS — Company code.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.BusinessTransaction">
+            <summary>BUSCS — Business transaction. Bắt buộc "G": F_CREATE_FB75 chỉ post khi BUSCS = 'G', giá trị khác SAP bỏ qua và trả RETURN rỗng.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.Customer">
+            <summary>ACCNT — Customer.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.DocumentType">
+            <summary>BLART — Document type.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.DocumentDate">
+            <summary>BLDAT — Document date.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.PostingDate">
+            <summary>BUDAT — Posting date.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.Reference">
+            <summary>XBLNR — Reference.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.Amount">
+            <summary>WRBTR — Tổng tiền (gồm thuế), VND.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.TaxBaseAmount">
+            <summary>FWBAS — Tiền trước thuế, VND.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.CalculateTax">
+            <summary>XMWST — Tự tính thuế.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.TaxCode">
+            <summary>MWSKZ — Tax code.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.TaxAmount">
+            <summary>WMWST — Tiền thuế, VND.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.ItemText">
+            <summary>SGTXT — Item text.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.GlAccount">
+            <summary>HKONT — GL account.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.DebitCreditIndicator">
+            <summary>SHKZG — Debit/credit indicator (S/H).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.CostCenter">
+            <summary>KOSTL — Cost center.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.ProfitCenter">
+            <summary>PRCTR — Profit center.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Fb75Request.CreditControlArea">
+            <summary>KKBER — Credit control area.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.MaterialTaxClassRequest">
+            <summary>
+            Đổi tax classification 1 của vật tư (MLAN-TAXM1) qua BAPI_MATERIAL_SAVEDATA — thay cho MM17.
+            Mỗi vật tư 1 lần gọi BAPI + commit. Thao tác "đặt TAXM1 = X" là idempotent nên gửi lại an toàn.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassRequest.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+            <example>TAX-20261014-001</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassRequest.Country">
+            <summary>MLAN-ALAND — quốc gia, mặc định VN.</summary>
+            <example>VN</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassRequest.TaxCategory">
+            <summary>Tax category (TATYP). Bỏ trống = loại thuế thứ 1 của quốc gia trong TSTL (VN: MWS1).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassRequest.TaxClass">
+            <summary>TAXM1 áp dụng cho mọi vật tư không có TaxClass riêng. VN/MWS1: 0 No tax, 1 Full tax, 2 Half tax, 3 Low tax rate, 4 Mixed, 5 Tax rate 8%.</summary>
+            <example>5</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassRequest.Items">
+            <summary>Danh sách vật tư (tối đa 500).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassItem.Material">
+            <summary>MATNR — mã vật tư (100016 hoặc 000000000000100016).</summary>
+            <example>100016</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.MaterialTaxClassItem.TaxClass">
+            <summary>TAXM1 riêng cho vật tư này (bỏ trống = dùng TaxClass chung).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceBapiCreateRequest">
+            <summary>
+            Tạo 1 hoặc nhiều bảng giá qua BAPI_PRICES_CONDITIONS (OPERATION 009). Luôn chặn trùng / chồng hiệu lực với bảng giá
+            có sẵn cùng khóa (kể cả bản chờ duyệt) và giữa các dòng trong request. Kiểm tra lỗi 1 dòng → không ghi dòng nào.
+            Mỗi dòng 1 lần gọi BAPI + commit.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceBapiCreateRequest.PendingApproval">
+            <summary>true = tạo ở trạng thái chờ duyệt (release status A); false = có hiệu lực ngay.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceBapiChangeRequest">
+            <summary>Sửa 1 hoặc nhiều bảng giá theo KNUMH qua BAPI_PRICES_CONDITIONS (OPERATION 004). Chỉ field được truyền mới bị đổi.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceBapiRecordsRequest">
+            <summary>Danh sách bảng giá (KNUMH) cho hủy hiệu lực / duyệt / gỡ duyệt.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceBapiRecordsRequest.ConditionRecordNumbers">
+            <summary>Danh sách số condition record (KNUMH).</summary>
+            <example>["0000119650"]</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceBapiRecordsRequest.ChangedBy">
+            <summary>Người thực hiện / ghi chú trên RDM (lưu ở nhật ký API).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceBapiLimits">
+            <summary>
+            Giới hạn số dòng / request bảng giá qua BAPI. Đồng bộ (POST /api/sd/prices-bapi[/...]) tối đa <see cref="F:Rdm.Application.Requests.PriceBapiLimits.SyncMaxItems"/>;
+            khai báo giá hàng loạt (đầu năm) dùng xử lý nền POST /api/sd/prices-bapi/jobs/... tối đa <see cref="F:Rdm.Application.Requests.PriceBapiLimits.BulkMaxItems"/>.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceOverlapMode">
+            <summary>Chế độ xử lý khi bảng giá mới chồng hiệu lực với bảng giá đã duyệt (KFRST trống) cùng khóa.</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.PriceOverlapMode.Reject">
+            <summary>Mọi chồng hiệu lực đều là lỗi PRICE_OVERLAP.</summary>
+        </member>
+        <member name="F:Rdm.Application.Requests.PriceOverlapMode.Replace">
+            <summary>
+            Cho phép chồng với bảng giá đã duyệt: khi tạo, SAP (VK11) tự cắt / tách hiệu lực bản cũ (trả cảnh báo).
+            Vẫn lỗi nếu chồng với bảng giá đang chờ duyệt hoặc trùng nguyên kỳ.
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceKeyInput">
+            <summary>
+            Khóa bảng giá. Trường cần truyền tùy loại điều kiện (bảng điều kiện trên DRF-930):
+              ZVLP / ZVDI → A990: SalesOrganization, DistributionChannel, SoldTo, ShipTo, Material, ShippingCondition, Plant
+              ZVIV        → A991: SalesOrganization (= sales org của đơn hàng, VKORGAU), Plant, Material
+              ZMIN        → A912 (khi có Incoterms): SalesOrganization, DistributionChannel, Material, Incoterms
+                            A919 (Region): CHỈ ĐỌC — tạo ZMIN chỉ theo A912 (nghiệp vụ / VK11 không dùng Region; DRF-930 không có region VN)
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.ConditionType">
+            <summary>KSCHL — ZVLP (giá niêm yết), ZVDI (chiết khấu), ZMIN (giá sàn), ZVIV (giá nội bộ).</summary>
+            <example>ZVLP</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.SalesOrganization">
+            <summary>VKORG (VKORGAU với ZVIV).</summary>
+            <example>G210</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.DistributionChannel">
+            <summary>VTWEG.</summary>
+            <example>10</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.SoldTo">
+            <summary>KUNAG — Sold-to.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.ShipTo">
+            <summary>KUNWE — Ship-to.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.Material">
+            <summary>MATNR.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.ShippingCondition">
+            <summary>VSBED — Shipping condition.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.Plant">
+            <summary>WERKS — Plant.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.Incoterms">
+            <summary>INCO1 — Incoterms (ZMIN theo A912).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceKeyInput.Region">
+            <summary>REGIO — Region (ZMIN theo A919): chỉ dùng để đọc; tạo bảng giá ZMIN truyền Region → PRICE_INVALID_KEY.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceCreateItem">
+            <summary>1 bảng giá cần tạo.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateItem.Amount">
+            <summary>
+            KBETR — Giá theo dấu của SAP: ZVLP / ZMIN / ZVIV dương; ZVDI (chiết khấu) âm. Số thực (VND không có số lẻ).
+            </summary>
+            <example>1250000</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateItem.Currency">
+            <summary>KONWA — Tiền tệ.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateItem.PricingUnit">
+            <summary>KPEIN — Pricing unit (giá cho bao nhiêu đơn vị).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateItem.Unit">
+            <summary>KMEIN — Đơn vị tính (mã nội bộ, vd. TO, BAG).</summary>
+            <example>TO</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateItem.ValidFrom">
+            <summary>DATAB — Hiệu lực từ.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateItem.ValidTo">
+            <summary>DATBI — Hiệu lực đến (bỏ trống = 31.12.9999).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceCreateRequest">
+            <summary>
+            Tạo 1 hoặc nhiều bảng giá (Z_ESD015_PRICE_UPLOAD, VK11). Bảng giá có hiệu lực ngay — việc duyệt đã làm trên RDM.
+            Kiểm tra lỗi 1 dòng → không tạo dòng nào. SAP ghi từng dòng (commit riêng): lỗi SAP ở vài dòng → PRICE_PARTIAL.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCreateRequest.OverlapMode">
+            <summary>Xử lý chồng hiệu lực với bảng giá đã duyệt. Mặc định Reject.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceChangeItem">
+            <summary>Sửa 1 bảng giá (theo số condition record KNUMH, VK12). Chỉ field được truyền mới bị đổi. Không đổi được hiệu lực từ.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceChangeItem.ConditionRecordNumber">
+            <summary>KNUMH — Số condition record.</summary>
+            <example>0000119650</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceChangeItem.Amount">
+            <summary>Giá mới (theo dấu SAP).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceChangeItem.ValidTo">
+            <summary>Hiệu lực đến mới.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceChangeItem.PeriodStart">
+            <summary>
+            Ngày bắt đầu của kỳ cần đổi ValidTo — chỉ cần khi record đã bị SAP tách thành nhiều kỳ (xem GET /api/sd/prices).
+            </summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceChangeRequest">
+            <summary>Sửa 1 hoặc nhiều bảng giá trong 1 giao dịch.</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceApproveRequest">
+            <summary>
+            Duyệt 1 hoặc nhiều bảng giá đang chờ duyệt (KFRST = A, nhập tay trên SAP) — VK12 đặt processing status 02 như ZSD_VN_PRICE_APR.
+            Bảng giá tạo qua API đã có hiệu lực ngay nên không cần duyệt. Bản ghi đã duyệt → bỏ qua (không lỗi), nên gửi lại an toàn.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceApproveRequest.ConditionRecordNumbers">
+            <summary>Danh sách KNUMH.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceApproveRequest.ApprovedBy">
+            <summary>Người duyệt trên RDM (lưu ở nhật ký API).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.PriceCopyWithVatRequest">
+            <summary>
+            Tạo bảng giá mới từ bảng giá cũ theo VAT%:
+              - Có OldVatPercent (giá đã gồm VAT, đổi thuế suất):  giá mới = giá cũ / (1 + OldVat%) × (1 + VatPercent%)
+              - Không có OldVatPercent (giá chưa VAT → gồm VAT):   giá mới = giá cũ × (1 + VatPercent%)
+            Giá được làm tròn theo RoundingUnit. Nguồn = bảng giá đã duyệt, còn hiệu lực tại SourceDate, khớp bộ lọc.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.Source">
+            <summary>Bộ lọc nguồn: ConditionType + SalesOrganization bắt buộc; các trường khóa khác tùy chọn.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.SourceDate">
+            <summary>Ngày lấy bảng giá nguồn (bỏ trống = ValidFrom - 1 ngày).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.VatPercent">
+            <summary>Thuế suất VAT mới (%), vd. 10.</summary>
+            <example>10</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.OldVatPercent">
+            <summary>Thuế suất VAT đang có trong giá cũ (%), vd. 8. Bỏ trống = giá cũ chưa gồm VAT.</summary>
+            <example>8</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.ValidFrom">
+            <summary>Hiệu lực từ của bảng giá mới.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.ValidTo">
+            <summary>Hiệu lực đến (bỏ trống = giữ hiệu lực đến của bản nguồn).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.RoundingUnit">
+            <summary>Làm tròn giá mới tới bội số này (VND), vd. 1, 10, 100, 1000.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.PriceCopyWithVatRequest.OverlapMode">
+            <summary>Mặc định Replace: bảng giá mới thay bảng giá cũ từ ValidFrom (SAP cắt hiệu lực bản cũ khi tạo).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.Va01Request">
+            <summary>
+            Z_ESD014_CREATE_VA01 (structure ZSSD_VA01) — Credit memo request 1 item.
+            Phía SAP chỉ chấp nhận loại đơn ZVCR; giá đi qua condition ZVAD (VND).
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.OrderType">
+            <summary>AUART — Sales document type (SAP chỉ nhận ZVCR).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.SalesOrganization">
+            <summary>VKORG — Sales organization.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.DistributionChannel">
+            <summary>VTWEG — Distribution channel.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.Division">
+            <summary>SPART — Division.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.SoldTo">
+            <summary>KUNAG — Sold-to party.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.ShipTo">
+            <summary>KUNWE — Ship-to party.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.CustomerPoNumber">
+            <summary>BSTKD — Customer PO number.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.BillingDate">
+            <summary>FKDAT — Billing date.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.OrderReason">
+            <summary>AUGRU — Order reason.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.HeaderText">
+            <summary>TEXT_LINE — Header text (text id 0001).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.Material">
+            <summary>MATNR — Material.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.Quantity">
+            <summary>ZMENG — Target quantity.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.Unit">
+            <summary>ZIEME — Target quantity UoM (mã nội bộ SAP, vd. KG, ST).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.Plant">
+            <summary>WERKS — Plant.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.ShippingPoint">
+            <summary>VSTEL — Shipping point.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va01Request.Rate">
+            <summary>KBETR — Rate của condition ZVAD (VND).</summary>
+        </member>
+        <member name="T:Rdm.Application.Requests.Va41Request">
+            <summary>
+            Z_ESD013_CREATE_VA41 (structure ZSSD_VA41) — Free goods contract 1 item.
+            SAP gọi BAPI_CONTRACT_CREATEFROMDATA rồi tự COMMIT; chỉ chấp nhận loại hợp đồng ZVCF.
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+            <example>VA41-0001</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.ContractType">
+            <summary>AUART — Contract type (SAP chỉ nhận ZVCF).</summary>
+            <example>ZVCF</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.SalesOrganization">
+            <summary>VKORG — Sales organization.</summary>
+            <example>G210</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.DistributionChannel">
+            <summary>VTWEG — Distribution channel.</summary>
+            <example>10</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.Division">
+            <summary>SPART — Division.</summary>
+            <example>11</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.SoldTo">
+            <summary>KUNAG — Sold-to party.</summary>
+            <example>100166</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.ShipTo">
+            <summary>KUNWE — Ship-to party.</summary>
+            <example>100166</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.CustomerPoNumber">
+            <summary>BSTKD — Customer PO number.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.ValidFrom">
+            <summary>GUEBG — Valid from.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.ValidTo">
+            <summary>GUEEN — Valid to.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.Material">
+            <summary>MATNR — Material.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.Quantity">
+            <summary>ZMENG — Target quantity.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.Unit">
+            <summary>ZIEME — Target quantity UoM (mã nội bộ SAP).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.Plant">
+            <summary>WERKS — Plant.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.ShippingPoint">
+            <summary>VSTEL — Shipping point.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Va41Request.ShippingCondition">
+            <summary>VSBED — Shipping conditions.</summary>
+            <example>PK</example>
+        </member>
+        <member name="T:Rdm.Application.Requests.Vbn1Request">
+            <summary>
+            Z_ESD012_CREATE_VBN1 (structure ZSSD_VBN1) — tạo condition record free goods (VBN1) bằng batch input.
+            SAP chỉ chấp nhận loại điều kiện ZA00. Key combination theo KeyCombination:
+              1 = Sales org / Distr. channel / Customer / Material / Plant / Shipping cond. (cần Customer)
+              2 = Sales org / Distr. channel / Sales office / Customer group 3 / Material / Plant / Shipping cond. (cần SalesOffice + CustomerGroup3)
+            Thành công không có số chứng từ (condition record), chỉ có message "Condition records for Free goods saved".
+            </summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.RequestId">
+            <summary>Khóa idempotency do client sinh.</summary>
+            <example>VBN1-0001</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.ConditionType">
+            <summary>KSCHL — Condition type (SAP chỉ nhận ZA00).</summary>
+            <example>ZA00</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.KeyCombination">
+            <summary>SELKZ — Key combination: "1" (theo khách hàng) hoặc "2" (theo sales office + customer group 3).</summary>
+            <example>1</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.SalesOrganization">
+            <summary>VKORG — Sales organization.</summary>
+            <example>G210</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.DistributionChannel">
+            <summary>VTWEG — Distribution channel.</summary>
+            <example>10</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.Customer">
+            <summary>KUNNR — Customer (bắt buộc khi KeyCombination = 1).</summary>
+            <example>100166</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.SalesOffice">
+            <summary>VKBUR — Sales office (bắt buộc khi KeyCombination = 2).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.CustomerGroup3">
+            <summary>ZZKVGR3 — Customer group 3 (bắt buộc khi KeyCombination = 2).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.Exclusive">
+            <summary>ZZEXCLUSIVE — Exclusive (chỉ dùng khi KeyCombination = 2).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.ValidFrom">
+            <summary>DATAB — Valid from.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.ValidTo">
+            <summary>DATBI — Valid to.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.Material">
+            <summary>MATNR — Material.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.Plant">
+            <summary>WERKS — Plant.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.ShippingCondition">
+            <summary>VSBED — Shipping conditions.</summary>
+            <example>PK</example>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.MinimumQuantity">
+            <summary>DISPKNRMM — Free goods: minimum quantity.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.FreeGoodsQuantity">
+            <summary>DISPKNRNM — Free goods: free goods quantity ("from").</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.QuantityUnit">
+            <summary>KNRME — Đơn vị của minimum quantity / free goods quantity.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.AdditionalQuantity">
+            <summary>DISPKNRZM — Free goods: additional quantity.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.AdditionalQuantityUnit">
+            <summary>KNREZ — Đơn vị của additional quantity.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.CalculationRule">
+            <summary>KNRRR — Calculation type (rule) cho free goods quantity, vd. 1.</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.FreeGoodsCategory">
+            <summary>KNRDD — Free goods category (vd. 1 = inclusive, 2 = exclusive...).</summary>
+        </member>
+        <member name="P:Rdm.Application.Requests.Vbn1Request.FreeGoodsMaterial">
+            <summary>KNRMAT — Material tặng kèm (bỏ trống = cùng material).</summary>
+        </member>
+    </members>
+</doc>

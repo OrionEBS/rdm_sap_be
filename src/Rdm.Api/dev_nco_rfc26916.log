@@ -1,0 +1,94 @@
+
+**** Log file opened by process 26916 at 2026-10-24 15:44:02 (UTC+07:00 SE Asia Standard Time)
+
+SAP .NET Connector 3.1 with file version 3.1.6.0 running on 64-bit .NET Framework 8.0.30
+Program: E:\rdmapi\src\Rdm.Api\bin\Debug\net8.0\Rdm.Api.exe
+Thread Name: .NET TP Worker
+Working directory: E:\rdmapi\src\Rdm.Api
+Trace directory: .\
+Trace encoding: utf-8
+Operating system: Windows Server 2016 Datacenter Server 64-bit 
+Processor: 14x AMD64 (or x64)
+SAP release: 789, Kernel release: 789, Kernel patch level: 413
+Hostname: WIN-QDJ02O98679, IP address: 192.168.228.95, IP_v6 address: fe80::107e:d5ed:e620:2c62
+Locale: en-GB (number decimal separator: ".", number group separator: ",", negative sign: "-")
+
+Default trace level: None
+
+>> Error entry 2026-10-24 15:44:02.097 [Thread 16 (.NET TP Worker)]
+[NAME=DRF CLIENT=930 USER=tuanna PASSWD=******** LANG=EN POOL_SIZE=10 MAX_POOL_WAIT_TIME=30000 POOL_IDLE_TIMEOUT=600 ASHOST=10.72.1.39 SYSNR=01 SYSID=DRF]
+SAP.Middleware.Connector.RfcInvalidStateException: metadata for function Z_ESD017_READ_KNKK not available: FU_NOT_FOUND: Function module Z_ESD017_READ_KNKK does not exist
+   at SAP.Middleware.Connector.RfcRepository.LookupFunctionMetadataNew(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 3093
+   at SAP.Middleware.Connector.RfcRepository.LookupFunctionMetadata(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 2986
+   at SAP.Middleware.Connector.RfcRepository.GetFunctionMetadata(String name, Boolean reload) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 1583
+   at SAP.Middleware.Connector.RfcRepository.GetFunctionMetadata(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 1527
+   at SAP.Middleware.Connector.RfcRepository.CreateFunction(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 994
+   at Rdm.Sap.SapMasterDataClient.<>c__DisplayClass5_1.<ReadCreditsByFunctionAsync>b__1() in E:\rdmapi\src\Rdm.Sap\SapMasterDataClient.Credit.cs:line 73
+   at Polly.ResiliencePipeline.<>c__35`1.<Execute>b__35_0(ResilienceContext _, Func`1 state)
+   at Polly.Utils.Pipeline.PipelineComponent.<>c__8`2.<ExecuteCoreSync>b__8_0(ResilienceContext context, ValueTuple`2 state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<<ExecuteCore>b__4_0>d.MoveNext()
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<ExecuteCore>b__4_0(ResilienceContext context, ValueTuple`2 state)
+   at Polly.Utils.StrategyHelper.ExecuteCallbackSafeAsync[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.CircuitBreaker.CircuitBreakerResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.CircuitBreaker.CircuitBreakerResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.DelegatingComponent.<>c__9`2.<ExecuteComponent>b__9_0(ResilienceContext context, ValueTuple`3 state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<<ExecuteCore>b__4_0>d.MoveNext()
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<ExecuteCore>b__4_0(ResilienceContext context, ValueTuple`2 state)
+   at Polly.Utils.StrategyHelper.ExecuteCallbackSafeAsync[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Retry.RetryResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.Retry.RetryResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.DelegatingComponent.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.CompositeComponent.ExecuteCoreWithoutTelemetry[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.CompositeComponent.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.PipelineComponent.ExecuteCoreSync[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.ResiliencePipeline.Execute[TResult](Func`1 callback)
+   at Rdm.Sap.SapMasterDataClient.<>c__DisplayClass5_0.<ReadCreditsByFunctionAsync>b__0() in E:\rdmapi\src\Rdm.Sap\SapMasterDataClient.Credit.cs:line 70
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+   at System.Threading.ThreadPoolWorkQueue.Dispatch()
+   at System.Threading.PortableThreadPool.WorkerThread.WorkerThreadStart()
+>> Error entry 2026-10-24 15:44:02.119 [Thread 16 (.NET TP Worker)]
+SAP.Middleware.Connector.RfcInvalidStateException: metadata for function Z_ESD017_READ_KNKK not available: FU_NOT_FOUND: Function module Z_ESD017_READ_KNKK does not exist
+   at SAP.Middleware.Connector.RfcRepository.LookupFunctionMetadataNew(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 3093
+   at SAP.Middleware.Connector.RfcRepository.LookupFunctionMetadata(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 2986
+   at SAP.Middleware.Connector.RfcRepository.GetFunctionMetadata(String name, Boolean reload) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 1583
+   at SAP.Middleware.Connector.RfcRepository.GetFunctionMetadata(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 1527
+   at SAP.Middleware.Connector.RfcRepository.CreateFunction(String name) in D:\depot\bas\789_REL\gen\optU\ntamd64\krn\rfc\nco3\krn\rfc\nco3\sapnco\RfcRepository.cs:line 994
+   at Rdm.Sap.SapMasterDataClient.<>c__DisplayClass5_1.<ReadCreditsByFunctionAsync>b__1() in E:\rdmapi\src\Rdm.Sap\SapMasterDataClient.Credit.cs:line 73
+   at Polly.ResiliencePipeline.<>c__35`1.<Execute>b__35_0(ResilienceContext _, Func`1 state)
+   at Polly.Utils.Pipeline.PipelineComponent.<>c__8`2.<ExecuteCoreSync>b__8_0(ResilienceContext context, ValueTuple`2 state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<<ExecuteCore>b__4_0>d.MoveNext()
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<ExecuteCore>b__4_0(ResilienceContext context, ValueTuple`2 state)
+   at Polly.Utils.StrategyHelper.ExecuteCallbackSafeAsync[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.CircuitBreaker.CircuitBreakerResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.CircuitBreaker.CircuitBreakerResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.DelegatingComponent.<>c__9`2.<ExecuteComponent>b__9_0(ResilienceContext context, ValueTuple`3 state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<<ExecuteCore>b__4_0>d.MoveNext()
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.Utils.Pipeline.BridgeComponent`1.<>c__4`2.<ExecuteCore>b__4_0(ResilienceContext context, ValueTuple`2 state)
+   at Polly.Utils.StrategyHelper.ExecuteCallbackSafeAsync[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Retry.RetryResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Polly.Retry.RetryResilienceStrategy`1.ExecuteCore[TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.BridgeComponent`1.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.DelegatingComponent.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.CompositeComponent.ExecuteCoreWithoutTelemetry[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.CompositeComponent.ExecuteCore[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.Utils.Pipeline.PipelineComponent.ExecuteCoreSync[TResult,TState](Func`3 callback, ResilienceContext context, TState state)
+   at Polly.ResiliencePipeline.Execute[TResult](Func`1 callback)
+   at Rdm.Sap.SapMasterDataClient.<>c__DisplayClass5_0.<ReadCreditsByFunctionAsync>b__0() in E:\rdmapi\src\Rdm.Sap\SapMasterDataClient.Credit.cs:line 70
+   at System.Threading.Tasks.Task`1.InnerInvoke()
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+   at System.Threading.ThreadPoolWorkQueue.Dispatch()
+   at System.Threading.PortableThreadPool.WorkerThread.WorkerThreadStart()

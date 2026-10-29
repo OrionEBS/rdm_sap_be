@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- NCo 3.1 (.NET core) dùng cpc4n.dll / ijwhost.dll native x64 → toàn bộ solution build x64. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <SapNcoDir>$(MSBuildThisFileDirectory)sapnco\lib</SapNcoDir>
+  </PropertyGroup>
+</Project>

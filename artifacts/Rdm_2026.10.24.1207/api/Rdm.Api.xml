@@ -1,0 +1,596 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Rdm.Api</name>
+    </assembly>
+    <members>
+        <member name="T:Rdm.Api.ApiCatalog.ApiDocs">
+            <summary>
+            2 tài liệu Swagger:
+              - <see cref="F:Rdm.Api.ApiCatalog.ApiDocs.Public"/> ("v1", /swagger): cho ĐỐI TÁC — chỉ API active, không API [InternalDoc] / PublicHidden; mô tả = mô tả đối tác
+                soạn trên trang quản trị (chưa soạn → để trống); XÓA mọi mô tả kỹ thuật lấy từ XML doc ở tham số / schema (tên BAPI, bảng SAP...).
+              - <see cref="F:Rdm.Api.ApiCatalog.ApiDocs.Internal"/> ("internal"): NỘI BỘ — đầy đủ XML doc, API đang bật (ApiDocs:InternalShowInactive = true: cả API đang tắt,
+                ghi "[ĐANG TẮT]"); tài liệu TS (.md) luôn liệt kê mọi API kèm trạng thái;
+                chỉ mở từ chính máy chủ (localhost), ApiDocs:InternalOpen = true, hoặc tải qua API quản trị (Admin).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiDocs.Include(System.String,Microsoft.AspNetCore.Mvc.ApiExplorer.ApiDescription,Rdm.Api.ApiCatalog.ApiEndpointRegistry,System.Boolean)">
+            <summary>
+            Lọc API theo tài liệu (dùng trong DocInclusionPredicate). API đang tắt không hiện ở CẢ 2 tài liệu;
+            internalShowInactive = true (ApiDocs:InternalShowInactive) → tài liệu nội bộ vẫn liệt kê, đánh dấu "[ĐANG TẮT]".
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiDocs.InternalAllowed(Microsoft.AspNetCore.Http.HttpContext,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>Tài liệu NỘI BỘ truy cập được khi: request từ chính máy chủ (localhost), hoặc cấu hình ApiDocs:InternalOpen = true.</summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.ApiDocsOperationFilter">
+            <summary>Tài liệu đối tác: thay mô tả bằng mô tả đối tác; tài liệu nội bộ: đánh dấu API đang tắt.</summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.ApiDocsDocumentFilter">
+            <summary>Tài liệu đối tác: xóa mô tả XML doc của mọi schema / thuộc tính (thường chứa tên field / bảng / BAPI SAP); đổi phần giới thiệu.</summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.AlwaysActiveAttribute">
+            <summary>Đánh dấu controller / action luôn active (không tắt được qua bảng cấu hình): đăng nhập, quản trị bảng cấu hình.</summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.InternalDocAttribute">
+            <summary>Luôn ẩn khỏi Swagger đối tác (chỉ có trong tài liệu nội bộ) — API quản trị, quản lý tài khoản.</summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.ApiEndpointRegistry">
+            <summary>
+            Trạng thái active / inactive của API (cache từ rdm.ApiEndpoints, làm mới định kỳ + ngay khi đổi qua API quản trị).
+            Khóa = "METHOD route-template" theo attribute route của action (VD "POST api/sd/prices-bapi/jobs/create").
+            API chưa có trong bảng (thêm code mà chưa đồng bộ) được coi là active.
+            </summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.ApiEndpointRegistry.PublicDoc">
+            <summary>Mô tả cho đối tác (Swagger công khai) của 1 API.</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.PublicDoc.#ctor(System.String,System.String,System.Boolean)">
+            <summary>Mô tả cho đối tác (Swagger công khai) của 1 API.</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.IsInternalDoc(System.String)">
+            <summary>API mang [InternalDoc] (theo code) — luôn ẩn khỏi tài liệu đối tác.</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.DiscoverInternalDocKeys(Microsoft.AspNetCore.Mvc.Infrastructure.IActionDescriptorCollectionProvider)">
+            <summary>Khóa của mọi action mang [InternalDoc].</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.GetPublicDoc(System.String,System.String)">
+            <summary>Mô tả đối tác; null = chưa soạn (Swagger công khai để trống — không lộ mô tả kỹ thuật).</summary>
+        </member>
+        <member name="P:Rdm.Api.ApiCatalog.ApiEndpointRegistry.StartedAtUtc">
+            <summary>Thời điểm API khởi động (đồng bộ bảng) — LastSeenAtUtc cũ hơn = API không còn trong code.</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.IsFullyInactivePath(Microsoft.AspNetCore.Http.PathString)">
+            <summary>Đường dẫn thuộc route mà MỌI method đều inactive — dùng khi routing trả 405 (sai method) để vẫn trả 404.</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.Discover(Microsoft.AspNetCore.Mvc.Infrastructure.IActionDescriptorCollectionProvider,System.String)">
+            <summary>Mọi action controller có attribute route trong code — mỗi HTTP method 1 khóa; mô tả lấy từ XML doc (như Swagger).</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointRegistry.LoadSummaries(System.String)">
+            <summary>"Namespace.Controller.Method" → nội dung &lt;summary&gt; (gộp khoảng trắng; &lt;see cref&gt; → tên cuối).</summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.ApiEndpointRefreshService">
+            <summary>Làm mới cache định kỳ (nhiều instance API dùng chung bảng; đổi ở instance khác áp dụng sau tối đa RefreshSeconds).</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiEndpointPipeline.UseApiEndpointSwitch(Microsoft.AspNetCore.Builder.IApplicationBuilder)">
+            <summary>
+            API inactive → 404 giống URL không tồn tại (đặt TRƯỚC authentication: không token cũng 404, không phải 401).
+            Gồm cả trường hợp sai method trên route mà mọi method đều inactive (routing trả 405 → đổi thành 404).
+            </summary>
+        </member>
+        <member name="T:Rdm.Api.ApiCatalog.ApiTsDocument">
+            <summary>
+            Tài liệu kỹ thuật (TS) NỘI BỘ dạng Markdown: theo nhóm → từng API (method, route, trạng thái, mô tả nội bộ + đối tác,
+            tham số, request / response) + phụ lục kiểu dữ liệu (thuộc tính, bắt buộc, mô tả XML doc — có chi tiết SAP).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiTsDocument.Collect(System.Type,System.Collections.Generic.List{System.Type},System.Int32)">
+            <summary>Kiểu DTO của dự án (namespace Rdm.*) + kiểu lồng, tối đa 3 cấp.</summary>
+        </member>
+        <member name="M:Rdm.Api.ApiCatalog.ApiTsDocument.LoadXmlDocs(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>Tên member XML doc ("T:...", "P:...", "M:...") → summary (gộp khoảng trắng, &lt;see cref&gt; → tên cuối).</summary>
+        </member>
+        <member name="T:Rdm.Api.Auth.JwtOptions">
+            <summary>Cấu hình JWT (section "Jwt").</summary>
+        </member>
+        <member name="P:Rdm.Api.Auth.JwtOptions.SigningKey">
+            <summary>Khóa ký HMAC-SHA256, tối thiểu 32 byte. Production đặt qua biến môi trường Jwt__SigningKey.</summary>
+        </member>
+        <member name="P:Rdm.Api.Auth.JwtOptions.ExpiryMinutes">
+            <summary>Thời hạn token (phút). Hết hạn phải gọi lại POST /api/auth/token.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.ApiEndpointsController">
+            <summary>
+            Bảng cấu hình active / inactive API (rdm.ApiEndpoints) — chỉ role Admin. API inactive: không hiện trên Swagger và trả 404 như
+            URL không tồn tại (kể cả khi không có token). Áp dụng ngay trên instance này; instance khác sau tối đa ApiEndpoints:RefreshSeconds.
+            API đăng nhập (api/auth) và chính API này luôn active (IsLocked).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.List(System.String,System.Nullable{System.Boolean},System.Threading.CancellationToken)">
+            <summary>Danh sách API + trạng thái. Lọc tùy chọn: group (tên controller), active (true / false).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.SetStatus(Rdm.Api.Controllers.ApiEndpointStatusRequest,System.Threading.CancellationToken)">
+            <summary>
+            Bật / tắt API theo danh sách khóa ("METHOD route", lấy ở GET) và / hoặc theo nhóm (tên controller, VD "PricesBapi").
+            API khóa (đăng nhập, quản trị) được bỏ qua.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.Groups(System.Threading.CancellationToken)">
+            <summary>Tổng hợp theo nhóm (controller): số API, đang bật, đang tắt, bị khóa — cho màn hình quản trị.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.Refresh(System.Threading.CancellationToken)">
+            <summary>Nạp lại bảng cấu hình ngay (khi sửa trực tiếp bằng procedure trên DB).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.SetDoc(Rdm.Api.Controllers.ApiEndpointDocRequest,System.Threading.CancellationToken)">
+            <summary>
+            Lưu mô tả cho ĐỐI TÁC của 1 API (Swagger công khai /swagger) — không đưa chi tiết kỹ thuật SAP. Trống = xóa (Swagger đối tác
+            để trống). publicHidden = true: ẩn API khỏi tài liệu đối tác (vẫn gọi được nếu đang bật). Mô tả nội bộ vẫn lấy từ code.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.ExportTs(Microsoft.AspNetCore.Mvc.ApiExplorer.IApiDescriptionGroupCollectionProvider,System.Threading.CancellationToken)">
+            <summary>Tải tài liệu kỹ thuật (TS) NỘI BỘ dạng Markdown — mọi API, mô tả nội bộ + đối tác, tham số, request / response, kiểu dữ liệu.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.ApiEndpointsController.ExportOpenApi(Swashbuckle.AspNetCore.Swagger.ISwaggerProvider)">
+            <summary>Tải OpenAPI NỘI BỘ (đầy đủ XML doc, mọi API) — dùng cho Postman / sinh client / tài liệu nội bộ.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointDocRequest.Key">
+            <summary>Khóa API "METHOD route".</summary>
+            <example>POST api/sd/prices-bapi/jobs/create</example>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointDocRequest.PublicSummary">
+            <summary>Tóm tắt cho đối tác (≤ 200 ký tự). Trống = xóa.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointDocRequest.PublicDescription">
+            <summary>Mô tả chi tiết cho đối tác (markdown, ≤ 2000 ký tự). Trống = xóa.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointDocRequest.PublicHidden">
+            <summary>true = ẩn khỏi tài liệu đối tác.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointStatusRequest.Keys">
+            <summary>Khóa API dạng "METHOD route" (VD "POST api/sd/prices-bapi/jobs/create").</summary>
+            <example>["POST api/sd/prices-bapi/jobs/create"]</example>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointStatusRequest.Groups">
+            <summary>Nhóm = tên controller (VD "PricesBapi", "Prices", "Fi", "MasterData").</summary>
+            <example>[]</example>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointStatusRequest.IsActive">
+            <summary>true = bật (active), false = tắt (inactive: ẩn khỏi Swagger, trả 404).</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.ApiEndpointStatusRequest.Note">
+            <summary>Ghi chú lý do (lưu vào bảng).</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.AuthController">
+            <summary>
+            Chứng thực JWT. Lấy token qua POST /api/auth/token rồi gửi header "Authorization: Bearer &lt;token&gt;" cho mọi API khác.
+            Token hết hạn sau Jwt:ExpiryMinutes (mặc định 60 phút) → gọi lại /api/auth/token.
+            </summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.AuthController.TokenRequest.Username">
+            <example>admin</example>
+        </member>
+        <member name="P:Rdm.Api.Controllers.AuthController.SaveUserRequest.Password">
+            <summary>Bỏ trống khi cập nhật = giữ mật khẩu cũ. Tối thiểu 8 ký tự.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.AuthController.SaveUserRequest.Role">
+            <summary>Admin hoặc User.</summary>
+            <example>User</example>
+        </member>
+        <member name="M:Rdm.Api.Controllers.AuthController.Token(Rdm.Api.Controllers.AuthController.TokenRequest,System.Threading.CancellationToken)">
+            <summary>Đăng nhập lấy access token (không cần token).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.AuthController.Me">
+            <summary>Thông tin tài khoản của token hiện tại.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.AuthController.ListUsers(System.Threading.CancellationToken)">
+            <summary>Danh sách tài khoản (chỉ Admin).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.AuthController.SaveUser(System.String,Rdm.Api.Controllers.AuthController.SaveUserRequest,System.Threading.CancellationToken)">
+            <summary>Tạo / cập nhật tài khoản: đổi mật khẩu, role, khóa / mở khóa (chỉ Admin).</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.CustomerCreditsController">
+            <summary>Hạn mức tín dụng khách hàng — KNKK qua RFC_READ_TABLE.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.CustomerCreditsController.GetAll(System.Threading.CancellationToken)">
+            <summary>Đọc KNKK của tất cả khách hàng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.CustomerCreditsController.GetByCustomer(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Đọc KNKK theo khách hàng (KUNNR) và credit control area (KKBER, bỏ trống = mọi credit control area).</summary>
+            <param name="customer">KUNNR, vd. 100166 (tự thêm 0 đầu).</param>
+            <param name="creditControlArea">KKBER, vd. G110.</param>
+            <param name="ct"></param>
+        </member>
+        <member name="T:Rdm.Api.Controllers.DbSyncController">
+            <summary>
+            Đồng bộ dữ liệu DB của API này (master data md.*, cấu hình API) sang DB Dev (DbSync:TargetConnectionString) — nút bấm trên
+            trang quản trị. Ghi DB đích chỉ qua stored procedure (md.usp_*_Replace, rdm.usp_ApiEndpoint_Import). Chỉ role Admin.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.DbSyncController.GetStatus">
+            <summary>Cấu hình hiện tại (server / database nguồn - đích, không lộ mật khẩu), đang chạy hay không, lần đồng bộ gần nhất.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.DbSyncController.Compare(System.Threading.CancellationToken)">
+            <summary>Số dòng từng bảng ở DB nguồn và DB đích (null = DB đích chưa có bảng).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.DbSyncController.Run(Rdm.Api.Controllers.DbSyncRunRequest)">
+            <summary>
+            Đồng bộ (dryRun = true: chỉ xem trước). Mode IfEmpty: chỉ nạp bảng đích đang trống, không đè cấu hình API đã chỉnh bên đích;
+            Replace: thay toàn bộ — phải gửi confirmTarget = tên database đích. migrate = true: cho phép chạy EF migration trên DB đích.
+            </summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.DbSyncRunRequest.Mode">
+            <summary>IfEmpty (mặc định) hoặc Replace.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.DbSyncRunRequest.DryRun">
+            <summary>true = chỉ xem trước, không ghi.</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.DbSyncRunRequest.Migrate">
+            <summary>Cho phép chạy EF migration trên DB đích (DB mới / DB cũ hơn).</summary>
+        </member>
+        <member name="P:Rdm.Api.Controllers.DbSyncRunRequest.ConfirmTarget">
+            <summary>Bắt buộc khi Mode = Replace và không phải xem trước: tên database đích.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.FiController">
+            <summary>Chứng từ kế toán (FI).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.FiController.CreateFb01(Rdm.Application.Requests.Fb01Request,System.Threading.CancellationToken)">
+            <summary>Tạo chứng từ FB01 (GL + khách hàng) — Z_EFI011_CREATE_FB01.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.FiController.CreateFb75(Rdm.Application.Requests.Fb75Request,System.Threading.CancellationToken)">
+            <summary>Tạo Customer credit memo FB75 — Z_EFI009_CREATE_FB75.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.FiController.Reverse(Rdm.Application.Requests.AccDocumentReversalRequest,System.Threading.CancellationToken)">
+            <summary>Đảo chứng từ kế toán — BAPI_ACC_DOCUMENT_REV_POST + BAPI_TRANSACTION_COMMIT.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.FiController.PostDocument(Rdm.Application.Requests.AccDocumentPostRequest,System.Threading.CancellationToken)">
+            <summary>
+            Hạch toán chứng từ FI nhiều dòng (G/L, khách hàng, thuế) — BAPI_ACC_DOCUMENT_POST + BAPI_TRANSACTION_COMMIT.
+            Dùng cho cấn trừ chiết khấu, chiết khấu thanh toán, lãi quá hạn, trích trước. Đảo bằng /api/fi/reversal.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.FiController.CheckDocument(Rdm.Application.Requests.AccDocumentPostRequest,System.Threading.CancellationToken)">
+            <summary>Kiểm tra chứng từ (BAPI_ACC_DOCUMENT_CHECK) — không ghi gì, không lưu nhật ký; requestId không bị giữ chỗ.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.AccDocumentCheckResponse">
+            <summary>Kết quả kiểm tra chứng từ: Ok = SAP không báo lỗi E/A.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.AccDocumentCheckResponse.#ctor(System.Boolean,System.String,System.String,System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.SapReturnMessage})">
+            <summary>Kết quả kiểm tra chứng từ: Ok = SAP không báo lỗi E/A.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.MasterDataController">
+            <summary>
+            Master data SD — mỗi bảng 1 cặp API:
+              POST /api/master-data/{bảng}/sync : đọc từ SAP (RFC_READ_TABLE) và thay toàn bộ bảng trong DB local.
+              GET  /api/master-data/{bảng}      : đọc từ DB local.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncSoldTo(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Sold-to từ SAP (KNA1 + KNVP partner AG, chưa đánh dấu xóa).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSoldTo(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Sold-to trong DB local. search: tìm theo mã KH / tên / NAME1 / mã số thuế.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSoldToByNumber(System.String,System.Threading.CancellationToken)">
+            <summary>1 Sold-to trong DB local (mã KH toàn số tự thêm 0 đầu).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncShipTo(System.Threading.CancellationToken)">
+            <summary>Đồng bộ danh mục Ship-to từ SAP (KNA1 của các khách là partner WE của sold-to).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetShipTo(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Danh mục Ship-to trong DB local. search: tìm theo mã / tên / NAME1 / mã số thuế.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetShipToByNumber(System.String,System.Threading.CancellationToken)">
+            <summary>1 Ship-to trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncSoldToShipTo(System.Threading.CancellationToken)">
+            <summary>Đồng bộ quan hệ Sold-to ↔ Ship-to từ SAP (KNVP, partner function WE).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSoldToShipTo(System.String,System.String,System.String,System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Quan hệ Sold-to ↔ Ship-to trong DB local, lọc theo sold-to / ship-to / sales area.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncSalesDistricts(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Sales District từ SAP (T171 / T171T).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSalesDistricts(System.Threading.CancellationToken)">
+            <summary>Sales District trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncSalesOffices(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Sales Office từ SAP (TVBUR / TVKBT + gán sales area TVKBZ).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSalesOffices(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Sales Office trong DB local; truyền sales area để chỉ lấy office được gán (TVKBZ).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSalesOfficeAssignments(System.String,System.Threading.CancellationToken)">
+            <summary>Gán Sales Office ↔ sales area (TVKBZ) trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncShippingConditions(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Shipping Condition từ SAP (TVSB / TVSBT).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetShippingConditions(System.Threading.CancellationToken)">
+            <summary>Shipping Condition trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncSalesOrgs(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Sales Organization từ SAP (TVKO / TVKOT).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSalesOrgs(System.Threading.CancellationToken)">
+            <summary>Sales Organization trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncPlants(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Plant từ SAP (T001W) — chỉ plant có quốc gia VN (cấu hình Sap:PlantCountries).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetPlants(System.String,System.Threading.CancellationToken)">
+            <summary>Plant trong DB local, lọc theo sales org (T001W-VKORG).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncPaymentMethods(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Payment Method từ SAP (T042Z).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetPaymentMethods(System.String,System.Threading.CancellationToken)">
+            <summary>Payment Method trong DB local, lọc theo quốc gia (vd. VN).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncVehicleTypes(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Vehicle Type từ SAP (shipping type T173 / T173T).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetVehicleTypes(System.Threading.CancellationToken)">
+            <summary>Vehicle Type trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncCustomerGroups3(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Customer Group 3 từ SAP (TVV3, tên từ TVV3T).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetCustomerGroups3(System.Threading.CancellationToken)">
+            <summary>Customer Group 3 trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncMaterials(System.Threading.CancellationToken)">
+            <summary>
+            Đồng bộ danh mục vật tư từ SAP — chỉ loại vật tư ZFNP (Finished Goods, cấu hình Sap:MaterialTypes):
+            MARA + tên EN/VI từ MAKT + đơn vị tính T006A.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetMaterials(System.String,System.String,System.String,System.String,System.Boolean,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Vật tư trong DB local. search: theo mã / tên EN / tên VI. Mặc định bỏ vật tư bị đánh dấu xóa (includeDeleted=true để lấy cả).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetMaterial(System.String,System.Threading.CancellationToken)">
+            <summary>1 vật tư trong DB local — nhận mã hiển thị (100016) hoặc mã SAP đủ 18 ký tự.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncMaterialGroups(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Material group từ SAP (T023 / T023T).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetMaterialGroups(System.Threading.CancellationToken)">
+            <summary>Material group trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncMaterialTypes(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Material type từ SAP (T134 / T134T).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetMaterialTypes(System.Threading.CancellationToken)">
+            <summary>Material type trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncDivisions(System.Threading.CancellationToken)">
+            <summary>Đồng bộ Division từ SAP (TSPA / TSPAT).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetDivisions(System.Threading.CancellationToken)">
+            <summary>Division trong DB local.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncGlAccounts(System.Threading.CancellationToken)">
+            <summary>
+            Đồng bộ danh mục tài khoản GL từ SAP (BAPI_GL_ACC_GETLIST) — chỉ COA 1000, cho các company code
+            thuộc CO area G100 (cấu hình Sap:ChartOfAccounts / Sap:ControllingArea).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetGlAccounts(System.String,System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Tài khoản GL trong DB local, lọc theo company code; search theo số tài khoản / tên.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncCostCenters(System.Threading.CancellationToken)">
+            <summary>Đồng bộ danh mục cost center từ SAP (BAPI_COSTCENTER_GETLIST1) — chỉ CO area G100 (Sap:ControllingArea).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetCostCenters(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Cost center trong DB local; search theo mã / tên / mô tả.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.SyncAll(System.Threading.CancellationToken)">
+            <summary>Đồng bộ tất cả bảng master data (cũng chạy định kỳ qua Hangfire job sync-master-data).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MasterDataController.GetSyncRuns(System.Nullable{Rdm.Application.MasterData.MasterDataObject},System.Int32,System.Threading.CancellationToken)">
+            <summary>Lịch sử đồng bộ (mới nhất trước).</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.MmController">
+            <summary>Vật tư (MM).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.MmController.UpdateTaxClassification(Rdm.Application.Requests.MaterialTaxClassRequest,System.Threading.CancellationToken)">
+            <summary>
+            Đổi tax classification 1 (MLAN-TAXM1) cho danh sách vật tư qua BAPI_MATERIAL_SAVEDATA (thay MM17).
+            Kết quả từng vật tư trong <c>messages</c> (<c>item</c> = mã vật tư, <c>messageV1</c> = giá trị cũ, <c>messageV2</c> = giá trị mới,
+            <c>number</c> = CHANGED / UNCHANGED / NOT_FOUND / FAILED / NOT_PROCESSED). Có vật tư lỗi → 422 (các vật tư khác vẫn đã cập nhật);
+            gửi lại cùng requestId an toàn.
+            </summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PostingResults">
+            <summary>
+            Map trạng thái posting → HTTP status. Body luôn là <see cref="T:Rdm.Application.Postings.PostingResponse"/> để client đọc message SAP nguyên văn.
+              200 Succeeded (kể cả Replayed) · 422 lỗi nghiệp vụ SAP · 503 không kết nối/đăng nhập được SAP (gửi lại được)
+              502 Unknown (KHÔNG gửi lại khi chưa kiểm tra SAP) · 500 lỗi nội bộ.
+            </summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PostingsController">
+            <summary>Tra cứu nhật ký các lần ghi SAP.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PostingsController.Search(Rdm.Application.Postings.PostingQuery,System.Threading.CancellationToken)">
+            <summary>Tìm kiếm theo nghiệp vụ / trạng thái / số chứng từ / khoảng thời gian tạo (UTC).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PostingsController.Get(System.Guid,System.Threading.CancellationToken)">
+            <summary>Lấy theo Id.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PostingsController.GetByRequestId(Rdm.Application.Postings.SapOperation,System.String,System.Threading.CancellationToken)">
+            <summary>Lấy theo nghiệp vụ + requestId của client.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PricesBapiController">
+             <summary>
+             Bảng giá ZVLP / ZVDI / ZMIN / ZVIV qua <b>BAPI_PRICES_CONDITIONS</b> (vỏ RFC Z_ESD016_PRICES_CONDITIONS) — tách riêng với
+             phương án BDC ở /api/sd/prices để so sánh. Ghi theo lô (Sap:PriceBapiChunkSize bảng giá / 1 lần gọi + commit);
+             lô bị SAP từ chối → ghi lại từng bảng giá để báo đúng dòng lỗi.
+             Response: successCount / failedCount + từng record (mã lỗi RDM, mã lỗi SAP dạng ID/NUMBER, nội dung).
+            
+             Đồng bộ (tối đa 500 dòng): HTTP 200 tất cả thành công · 400 dữ liệu sai / quá 500 dòng · 409 requestId đang xử lý / Unknown ·
+             422 lỗi kiểm tra hoặc lỗi SAP (PRICE_VALIDATION = không ghi gì; PRICE_PARTIAL = ghi được một phần) · 502 Unknown · 503 mất kết nối SAP.
+            
+             Hàng loạt — khai báo giá đầu năm (tối đa 20.000 dòng): POST /jobs/{operation} → 202 + Location; GET /jobs/{operation}/{requestId}
+             → 202 khi đang chạy (progress), xong thì trả kết quả với HTTP như đồng bộ. Gửi lại cùng requestId + payload khi đang chạy
+             → 202 trạng thái hiện tại; đã xong → kết quả cũ (replayed).
+             </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.Create(Rdm.Application.Requests.PriceBapiCreateRequest,System.Threading.CancellationToken)">
+            <summary>Tạo 1 / nhiều bảng giá (OPERATION 009), tối đa 500 dòng. Chặn trùng / chồng hiệu lực với bảng giá cùng khóa và giữa các dòng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.Change(Rdm.Application.Requests.PriceBapiChangeRequest,System.Threading.CancellationToken)">
+            <summary>Sửa 1 / nhiều bảng giá theo KNUMH (OPERATION 004): giá, pricing unit, đơn vị, hiệu lực đến. Tối đa 500 dòng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.Invalidate(Rdm.Application.Requests.PriceBapiRecordsRequest,System.Threading.CancellationToken)">
+            <summary>Hủy hiệu lực 1 / nhiều bảng giá (đánh dấu xóa — INDIDELETE). Bản đã hủy được bỏ qua. Tối đa 500 dòng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.Approve(Rdm.Application.Requests.PriceBapiRecordsRequest,System.Threading.CancellationToken)">
+            <summary>Duyệt 1 / nhiều bảng giá (release status A → trống). Bản đã duyệt được bỏ qua. Tối đa 500 dòng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.Unapprove(Rdm.Application.Requests.PriceBapiRecordsRequest,System.Threading.CancellationToken)">
+            <summary>Gỡ duyệt 1 / nhiều bảng giá (release status trống → A). Bản đang chờ duyệt được bỏ qua. Tối đa 500 dòng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.CreateJob(Rdm.Application.Requests.PriceBapiCreateRequest,System.Threading.CancellationToken)">
+            <summary>Khai báo giá hàng loạt: tạo tối đa 20.000 bảng giá, xử lý nền. Trả 202 + Location để theo dõi.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.ChangeJob(Rdm.Application.Requests.PriceBapiChangeRequest,System.Threading.CancellationToken)">
+            <summary>Sửa hàng loạt (tối đa 20.000 dòng), xử lý nền.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.InvalidateJob(Rdm.Application.Requests.PriceBapiRecordsRequest,System.Threading.CancellationToken)">
+            <summary>Hủy hiệu lực hàng loạt (tối đa 20.000 KNUMH), xử lý nền.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.ApproveJob(Rdm.Application.Requests.PriceBapiRecordsRequest,System.Threading.CancellationToken)">
+            <summary>Duyệt hàng loạt (tối đa 20.000 KNUMH), xử lý nền.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.UnapproveJob(Rdm.Application.Requests.PriceBapiRecordsRequest,System.Threading.CancellationToken)">
+            <summary>Gỡ duyệt hàng loạt (tối đa 20.000 KNUMH), xử lý nền.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesBapiController.GetJob(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Trạng thái / kết quả job hàng loạt. operation = create | change | invalidate | approve | unapprove.
+            202 = đang chờ / đang chạy (xem progress: total, done, succeeded, failed); xong → HTTP như API đồng bộ; 404 = không có requestId.
+            </summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PriceBapiResult">
+            <summary>Kết quả 1 thao tác bảng giá qua BAPI.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PriceBapiResult.#ctor(System.String,Rdm.Application.Postings.PostingStatus,System.Boolean,System.Int32,System.Int32,System.Int32,System.String,System.String,System.Collections.Generic.IReadOnlyList{Rdm.Api.Controllers.PriceBapiRecordResult},System.Guid,System.Boolean,System.Nullable{Rdm.Application.Postings.ProgressSnapshot})">
+            <summary>Kết quả 1 thao tác bảng giá qua BAPI.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PriceBapiRecordResult">
+            <summary>Kết quả 1 bảng giá (Item = số dòng khi tạo / sửa, KNUMH khi hủy / duyệt / gỡ duyệt).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PriceBapiRecordResult.#ctor(System.String,System.String,System.Boolean,System.Boolean,System.String,System.String,System.String,System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.SapReturnMessage},System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>Kết quả 1 bảng giá (Item = số dòng khi tạo / sửa, KNUMH khi hủy / duyệt / gỡ duyệt).</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PricesController">
+            <summary>
+            Bảng giá ZVLP / ZVDI / ZMIN / ZVIV — Z_ESD015_PRICE_UPLOAD (VK11 / VK12 bằng BDC, như report ZSD_VN_PRICE_UPLD).
+            Bảng giá tạo / sửa qua API có hiệu lực ngay (duyệt đã làm trên RDM).
+            Kiểm tra theo lô: 1 dòng lỗi → không ghi dòng nào (422, ErrorCode PRICE_VALIDATION, mã lỗi từng dòng ở messages[].number,
+            số dòng ở messages[].item). SAP ghi từng dòng: lỗi SAP ở vài dòng → 422 PRICE_PARTIAL. Mã lỗi: xem PriceErrorCodes.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesController.Get(Rdm.Application.Postings.PriceQuery,System.Threading.CancellationToken)">
+            <summary>
+            Đọc bảng giá trên SAP (mỗi dòng = 1 kỳ hiệu lực, kèm giá KONP).
+            Bắt buộc: conditionType, salesOrganization, validFrom, validTo (lấy các kỳ giao với khoảng này); các bộ lọc khác tùy chọn.
+            ZVLP / ZVDI → A990 (sold-to, ship-to, material, shipping cond., plant); ZVIV → A991 (sales org đơn hàng, plant, material);
+            ZMIN → A912 (incoterms) + A919 (region).
+            Mỗi bảng có cấu trúc cột khóa khác nhau: <c>tables</c> mô tả cột của từng bảng trong kết quả; mỗi dòng <c>items</c>
+            chỉ có cột khóa của bảng mình (<c>conditionTable</c>) + cột chi tiết chung (trạng thái, hiệu lực, giá KONP).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesController.Check(Rdm.Application.Requests.PriceCreateRequest,System.Threading.CancellationToken)">
+            <summary>Kiểm tra lô bảng giá (khóa, hiệu lực, dấu giá, trùng / chồng hiệu lực) — không ghi SAP, không lưu nhật ký.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesController.Create(Rdm.Application.Requests.PriceCreateRequest,System.Threading.CancellationToken)">
+            <summary>Tạo 1 hoặc nhiều bảng giá (VK11, có hiệu lực ngay). messages[].messageV1 = KNUMH mới của từng dòng.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesController.Change(Rdm.Application.Requests.PriceChangeRequest,System.Threading.CancellationToken)">
+            <summary>Sửa 1 hoặc nhiều bảng giá theo KNUMH (VK12): giá, pricing unit, đơn vị, hiệu lực đến.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesController.Approve(Rdm.Application.Requests.PriceApproveRequest,System.Threading.CancellationToken)">
+            <summary>
+            Duyệt 1 hoặc nhiều bảng giá chờ duyệt KFRST = A (nhập tay trên SAP) — VK12 processing status 02, như ZSD_VN_PRICE_APR.
+            Bản đã duyệt được bỏ qua.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PricesController.CopyWithVat(Rdm.Application.Requests.PriceCopyWithVatRequest,System.Threading.CancellationToken)">
+            <summary>
+            Tạo bảng giá mới từ bảng giá cũ theo VAT% (vd. đổi 8% → 10%: oldVatPercent = 8, vatPercent = 10).
+            messages[].messageV1 = KNUMH mới, messageV2 = KNUMH nguồn, messageV3 / V4 = giá cũ / mới.
+            </summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.PriceCheckResponse">
+            <summary>Kết quả kiểm tra lô bảng giá: Ok = không có dòng lỗi (có thể có cảnh báo PRICE_WILL_ADJUST_EXISTING).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.PriceCheckResponse.#ctor(System.Boolean,System.String,System.String,System.Collections.Generic.IReadOnlyList{Rdm.Application.Postings.SapReturnMessage})">
+            <summary>Kết quả kiểm tra lô bảng giá: Ok = không có dòng lỗi (có thể có cảnh báo PRICE_WILL_ADJUST_EXISTING).</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.SapController">
+            <summary>Kiểm tra kết nối SAP.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SapController.Ping(System.Threading.CancellationToken)">
+            <summary>Gọi RFC_SYSTEM_INFO — trả SID, client, host, release.</summary>
+        </member>
+        <member name="T:Rdm.Api.Controllers.SdController">
+            <summary>Bán hàng (SD).</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SdController.CreateVa01(Rdm.Application.Requests.Va01Request,System.Threading.CancellationToken)">
+            <summary>Tạo Credit memo request (VA01, loại ZVCR) — Z_ESD014_CREATE_VA01.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SdController.CreateVa41(Rdm.Application.Requests.Va41Request,System.Threading.CancellationToken)">
+            <summary>Tạo Free goods contract (VA41, loại ZVCF) — Z_ESD013_CREATE_VA41.</summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SdController.CreateVbn1(Rdm.Application.Requests.Vbn1Request,System.Threading.CancellationToken)">
+            <summary>
+            Tạo condition record free goods (VBN1, loại ZA00) — Z_ESD012_CREATE_VBN1 (batch input).
+            Thành công không có số chứng từ; xem message "Condition records for Free goods saved".
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SdController.CreateContract(Rdm.Application.Requests.ContractCreateRequest,System.Threading.CancellationToken)">
+            <summary>
+            Tạo sale contract — BAPI_CONTRACT_CREATEFROMDATA + COMMIT. Mặc định ở trạng thái chờ duyệt
+            (delivery + billing block duyệt, mặc định 30); duyệt bằng /api/sd/contracts/approve. documentNumber = số hợp đồng.
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SdController.ChangeContract(Rdm.Application.Requests.ContractChangeRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sửa sale contract — BAPI_CUSTOMERCONTRACT_CHANGE + COMMIT: hiệu lực, PO, điều kiện giao/thanh toán; thêm / sửa / từ chối dòng.
+            Mặc định gắn lại block duyệt (requireReapproval).
+            </summary>
+        </member>
+        <member name="M:Rdm.Api.Controllers.SdController.ApproveContract(Rdm.Application.Requests.ContractApproveRequest,System.Threading.CancellationToken)">
+            <summary>Duyệt sale contract — gỡ delivery + billing block duyệt (BAPI_CUSTOMERCONTRACT_CHANGE + COMMIT).</summary>
+        </member>
+        <member name="T:Rdm.Api.DbSync.DbSyncRunResult">
+            <summary>Kết quả 1 lần đồng bộ (hoặc xem trước) DB này → DB Dev.</summary>
+        </member>
+        <member name="M:Rdm.Api.DbSync.DbSyncRunResult.#ctor(System.Boolean,System.String,System.Boolean,System.String,System.String,System.String,System.DateTime,System.Int32,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{Rdm.Infrastructure.DbSync.DbTableResult},System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>Kết quả 1 lần đồng bộ (hoặc xem trước) DB này → DB Dev.</summary>
+        </member>
+        <member name="T:Rdm.Api.DbSync.DbSyncRunner">
+            <summary>
+            Đồng bộ DB của API này (nguồn) sang DB Dev (đích, DbSync:TargetConnectionString) theo nút bấm trên trang quản trị.
+            Dùng chung engine với CLI Rdm.DbSync: đọc bằng EF, ghi DB đích chỉ qua stored procedure. Mỗi lúc chỉ 1 lần chạy.
+            Không cấu hình DbSync:TargetConnectionString → tính năng tắt.
+            </summary>
+        </member>
+        <member name="P:Rdm.Api.DbSync.DbSyncRunner.LastRun">
+            <summary>Lần đồng bộ thật gần nhất (không tính xem trước) kể từ khi API khởi động.</summary>
+        </member>
+        <member name="P:Rdm.Api.DbSync.DbSyncRunner.TargetDatabase">
+            <summary>Tên database đích — người dùng phải gõ lại để xác nhận chế độ Replace.</summary>
+        </member>
+        <member name="T:Rdm.Api.ExceptionHandling.GlobalExceptionHandler">
+            <summary>
+            Exception → ProblemDetails (RFC 7807).
+              PostingConflictException → 409 (kèm bản ghi posting hiện có) · SapReadException → 503 (kết nối/logon) hoặc 502 · còn lại → 500.
+            Lỗi phía SAP không đi qua đây — SapClient trả về trong PostingResponse.
+            </summary>
+        </member>
+    </members>
+</doc>

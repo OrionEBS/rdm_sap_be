@@ -1,0 +1,13 @@
+bin/
+obj/
+logs/
+*.user
+.vs/
+dev_nco_rfc.log
+TestResults/
+
+.run/
+
+# Target DB của máy build (có mật khẩu)
+config/targets/*.json
+!config/targets/*.example.json

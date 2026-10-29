@@ -1,0 +1,14 @@
+﻿{
+    "product":  "RDM SAP Integration (Rdm.Api + Rdm.Worker)",
+    "version":  "2026.10.26.1027",
+    "builtAtUtc":  "2026-10-26T03:27:41.8006910Z",
+    "builtOn":  "WIN-QDJ02O98679",
+    "dotnet":  "8.0.421",
+    "runtime":  "win-x64, framework-dependent (.NET 8 Hosting Bundle)",
+    "sapNco":  "3.1.6.0",
+    "data":  {
+                 "file":  "data/rdm-data.json.gz",
+                 "tables":  "md.*,rdm.ApiEndpoints",
+                 "sha256":  "EC44E37BAB1566266EE93BE087A39C29F666C5AB76401F634C512D124A16CD18"
+             }
+}

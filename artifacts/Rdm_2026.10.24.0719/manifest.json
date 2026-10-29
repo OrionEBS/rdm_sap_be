@@ -1,0 +1,9 @@
+﻿{
+    "product":  "RDM SAP Integration (Rdm.Api + Rdm.Worker)",
+    "version":  "2026.10.24.0719",
+    "builtAtUtc":  "2026-10-24T00:19:15.2978981Z",
+    "builtOn":  "WIN-QDJ02O98679",
+    "dotnet":  "8.0.421",
+    "runtime":  "win-x64, framework-dependent (.NET 8 Hosting Bundle)",
+    "sapNco":  "3.1.6.0"
+}

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rdm.Application\Rdm.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="Polly.Core" Version="8.4.2" />
+    <!-- sapnco.dll tham chiếu System.Configuration.ConfigurationManager 5.0; phải có trong deps.json, chỉ copy DLL là không đủ. -->
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="sapnco">
+      <HintPath>$(SapNcoDir)\sapnco.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="sapnco_utils">
+      <HintPath>$(SapNcoDir)\sapnco_utils.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- Native/mixed-mode runtime của NCo — không add reference được, chỉ copy cạnh output. -->
+    <Content Include="$(SapNcoDir)\ijwhost.dll;$(SapNcoDir)\cpc4n.dll">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Rdm.Tests" />
+  </ItemGroup>
+
+</Project>
